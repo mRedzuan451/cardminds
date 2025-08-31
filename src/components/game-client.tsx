@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, FilePlus, Trophy, Users } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -23,7 +23,6 @@ import Confetti from 'react-confetti';
 
 type GameState = 'initial' | 'player1Turn' | 'player2Turn' | 'roundOver' | 'gameOver';
 type Player = 'Player 1' | 'Player 2';
-const MAX_DRAWS = 1;
 const TOTAL_ROUNDS = 3;
 
 export default function GameClient() {
@@ -49,7 +48,6 @@ export default function GameClient() {
   const [currentPlayer, setCurrentPlayer] = useState<Player>('Player 1');
   
   const [showHint, setShowHint] = useState(false);
-  const [drawsLeft, setDrawsLeft] = useState(MAX_DRAWS);
   
   const [roundWinner, setRoundWinner] = useState<Player | 'draw' | null>(null);
 
@@ -81,9 +79,18 @@ export default function GameClient() {
     setTargetCards(cardsUsed);
     freshDeck = updatedDeck;
 
-    setPlayer1Hand(freshDeck.slice(0, 5));
-    setPlayer2Hand(freshDeck.slice(5, 10));
-    setDeck(freshDeck.slice(10));
+    const p1Hand = freshDeck.slice(0, 5);
+    const p2Hand = freshDeck.slice(5, 10);
+    let remainingDeck = freshDeck.slice(10);
+    
+    // Player 1 automatically draws a card
+    if (remainingDeck.length > 0) {
+      p1Hand.push(remainingDeck.shift()!);
+    }
+
+    setPlayer1Hand(p1Hand);
+    setPlayer2Hand(p2Hand);
+    setDeck(remainingDeck);
     
     setEquation([]);
     setUsedCardIndices(new Set());
@@ -97,7 +104,6 @@ export default function GameClient() {
     setPlayer2Passed(false);
     setRoundWinner(null);
     setShowHint(false);
-    setDrawsLeft(MAX_DRAWS);
     setCurrentPlayer('Player 1');
     setGameState('player1Turn');
   }, []);
@@ -128,19 +134,22 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
-  const determineRoundWinner = useCallback((p1Score: number, p2Score: number) => {
+  const determineRoundWinner = useCallback(() => {
     let winner: Player | 'draw' | null = null;
-    if (p1Score > p2Score) {
+    const p1s = player1RoundScore;
+    const p2s = player2RoundScore;
+
+    if (p1s > p2s) {
       winner = 'Player 1';
-    } else if (p2Score > p1Score) {
+    } else if (p2s > p1s) {
       winner = 'Player 2';
     } else {
       winner = 'draw';
     }
     setRoundWinner(winner);
 
-    const nextP1Total = player1TotalScore + p1Score;
-    const nextP2Total = player2TotalScore + p2Score;
+    const nextP1Total = player1TotalScore + p1s;
+    const nextP2Total = player2TotalScore + p2s;
     
     setPlayer1TotalScore(nextP1Total);
     setPlayer2TotalScore(nextP2Total);
@@ -153,12 +162,21 @@ export default function GameClient() {
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1TotalScore, player2TotalScore]);
+  }, [currentRound, player1RoundScore, player2RoundScore, player1TotalScore, player2TotalScore]);
 
   const switchTurn = () => {
     setEquation([]);
     setUsedCardIndices(new Set());
-    setDrawsLeft(MAX_DRAWS);
+    
+    let nextPlayer2Hand = [...player2Hand];
+    let nextDeck = [...deck];
+    if (nextDeck.length > 0) {
+      nextPlayer2Hand.push(nextDeck.shift()!);
+      setPlayer2Hand(nextPlayer2Hand);
+      setDeck(nextDeck);
+      toast({title: "Player 2 Drew a Card", description: "A new card has been added to Player 2's hand."});
+    }
+
     setCurrentPlayer('Player 2');
     setGameState('player2Turn');
     setShowTurnInterstitial(true);
@@ -174,30 +192,14 @@ export default function GameClient() {
       setPlayer1Passed(passed);
       switchTurn();
     } else { // Player 2
-      const p2Score = newScore;
-      setPlayer2RoundScore(p2Score);
+      setPlayer2RoundScore(newScore);
       setPlayer2FinalResult(result);
       setPlayer2Equation(equation);
       setPlayer2Passed(passed);
-      // Now that both players have played, determine the winner.
-      determineRoundWinner(player1RoundScore, p2Score);
+      determineRoundWinner();
     }
-  }, [currentPlayer, equation, targetNumber, player1RoundScore, determineRoundWinner]);
+  }, [currentPlayer, equation, targetNumber, determineRoundWinner, deck, player2Hand]);
 
-  const handleDrawCard = () => {
-    if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
-    if (drawsLeft <= 0 || deck.length === 0) return;
-
-    const [newCard, ...restOfDeck] = deck;
-    if (currentPlayer === 'Player 1') {
-      setPlayer1Hand([...player1Hand, newCard]);
-    } else {
-      setPlayer2Hand([...player2Hand, newCard]);
-    }
-    setDeck(restOfDeck);
-    setDrawsLeft(drawsLeft - 1);
-    toast({ title: "Card Drawn", description: "You drew a new card."});
-  };
 
   const handlePass = () => {
     if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
@@ -242,15 +244,6 @@ export default function GameClient() {
         setShowConfetti(true);
     }
   }, [gameState, showConfetti, totalWinner]);
-
-  useEffect(() => {
-    if (gameState === 'roundOver' || gameState === 'gameOver') {
-      // Nothing to do here
-    } else if (currentPlayer === 'Player 2' && gameState === 'player1Turn') {
-      // This is an invalid state, P2 is current player but it's P1's turn state. Resetting.
-      setCurrentPlayer('Player 1');
-    }
-  }, [gameState, currentPlayer]);
 
 
   const handleNextRound = () => {
@@ -354,7 +347,7 @@ export default function GameClient() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline text-4xl text-center">Player 2's Turn!</AlertDialogTitle>
             <AlertDialogDescription className="text-center text-lg">
-              Pass the device to Player 2.
+              Pass the device to Player 2. A new card has been added to their hand.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
@@ -431,8 +424,8 @@ export default function GameClient() {
             <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-              <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1" size="sm" disabled={equation.length < 3}>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length < 3}>
                 <Send className="mr-2 h-4 w-4"/> Submit
               </Button>
               <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
@@ -440,9 +433,6 @@ export default function GameClient() {
               </Button>
                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
                 <X className="mr-2 h-4 w-4"/> Clear
-              </Button>
-              <Button onClick={handleDrawCard} variant="outline" className="flex-grow" disabled={drawsLeft <= 0 || deck.length === 0} size="sm">
-                <FilePlus className="mr-2 h-4 w-4" /> Draw ({drawsLeft})
               </Button>
             </div>
           </CardContent>
@@ -477,3 +467,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
