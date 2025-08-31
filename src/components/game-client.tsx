@@ -163,6 +163,7 @@ export default function GameClient() {
   
   const executeBotTurn = useCallback(async () => {
     if (gameState !== 'botTurn') {
+      setIsBotThinking(false);
       return;
     }
 
@@ -180,7 +181,7 @@ export default function GameClient() {
 
       if (botResponse.action === 'play' && botResponse.equation.length > 0) {
         const botEqRaw = botResponse.equation;
-        const botEq = botEqRaw.map(term => typeof term === 'string' && CARD_VALUES[term as 'J' | 'Q' | 'K'] ? CARD_VALUES[term as 'J' | 'Q' | 'K'] : term) as EquationTerm[]
+        const botEq = botEqRaw.map(term => CARD_VALUES[term as keyof typeof CARD_VALUES] || term) as EquationTerm[]
 
         const evaluation = evaluateEquation(botEq);
         let currentBotScore = 0;
