@@ -23,7 +23,7 @@ import Confetti from 'react-confetti';
 
 type GameState = 'initial' | 'player1Turn' | 'player2Turn' | 'roundOver' | 'gameOver';
 type Player = 'Player 1' | 'Player 2';
-const MAX_DRAWS = 3;
+const MAX_DRAWS = 1;
 const TOTAL_ROUNDS = 3;
 
 export default function GameClient() {
@@ -128,7 +128,7 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
-  const determineRoundWinner = (p1Score: number, p2Score: number) => {
+  const determineRoundWinner = useCallback((p1Score: number, p2Score: number) => {
     let winner: Player | 'draw' | null = null;
     if (p1Score > p2Score) {
       winner = 'Player 1';
@@ -141,6 +141,7 @@ export default function GameClient() {
 
     const nextP1Total = player1TotalScore + p1Score;
     const nextP2Total = player2TotalScore + p2Score;
+    
     setPlayer1TotalScore(nextP1Total);
     setPlayer2TotalScore(nextP2Total);
 
@@ -152,7 +153,7 @@ export default function GameClient() {
     } else {
       setGameState('roundOver');
     }
-  };
+  }, [currentRound, player1TotalScore, player2TotalScore]);
 
   const switchTurn = () => {
     setEquation([]);
@@ -163,7 +164,7 @@ export default function GameClient() {
     setShowTurnInterstitial(true);
   };
 
-  const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
+  const endPlayerTurn = useCallback((result: number, cardsUsedCount: number, passed: boolean) => {
     const newScore = passed ? 0 : calculateScore(result, targetNumber, cardsUsedCount);
 
     if (currentPlayer === 'Player 1') {
@@ -181,7 +182,7 @@ export default function GameClient() {
       // Now that both players have played, determine the winner.
       determineRoundWinner(player1RoundScore, p2Score);
     }
-  };
+  }, [currentPlayer, equation, targetNumber, player1RoundScore, determineRoundWinner]);
 
   const handleDrawCard = () => {
     if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
@@ -229,11 +230,18 @@ export default function GameClient() {
     }
   };
 
+  const totalWinner = useMemo(() => {
+    if (gameState !== 'gameOver') return null;
+    if (player1TotalScore > player2TotalScore) return 'Player 1';
+    if (player2TotalScore > player1TotalScore) return 'Player 2';
+    return 'draw';
+  }, [gameState, player1TotalScore, player2TotalScore]);
+
   useEffect(() => {
     if (gameState === 'gameOver' && totalWinner === 'Player 1' && !showConfetti) {
         setShowConfetti(true);
     }
-  }, [gameState, showConfetti]);
+  }, [gameState, showConfetti, totalWinner]);
 
   useEffect(() => {
     if (gameState === 'roundOver' || gameState === 'gameOver') {
@@ -275,13 +283,6 @@ export default function GameClient() {
       case 'draw': return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
     }
   };
-
-  const totalWinner = useMemo(() => {
-    if (gameState !== 'gameOver') return null;
-    if (player1TotalScore > player2TotalScore) return 'Player 1';
-    if (player2TotalScore > player1TotalScore) return 'Player 2';
-    return 'draw';
-  }, [gameState, player1TotalScore, player2TotalScore]);
 
   const isPlayerTurn = gameState === 'player1Turn' || gameState === 'player2Turn';
 
@@ -431,15 +432,12 @@ export default function GameClient() {
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-              {equation.length >= 3 ? (
-                <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1" size="sm">
-                  <Send className="mr-2 h-4 w-4"/> Submit
-                </Button>
-              ) : (
-                <Button onClick={handlePass} className="flex-grow col-span-2 md:col-span-1" variant="secondary" size="sm">
-                  <LogOut className="mr-2 h-4 w-4"/> Pass
-                </Button>
-              )}
+              <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1" size="sm" disabled={equation.length < 3}>
+                <Send className="mr-2 h-4 w-4"/> Submit
+              </Button>
+              <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
+                <LogOut className="mr-2 h-4 w-4"/> Pass
+              </Button>
                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
                 <X className="mr-2 h-4 w-4"/> Clear
               </Button>
