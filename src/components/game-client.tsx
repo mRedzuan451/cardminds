@@ -42,6 +42,7 @@ export default function GameClient() {
   const [botScore, setBotScore] = useState<number>(0);
   const [botFinalResult, setBotFinalResult] = useState<number>(0);
   const [botEquation, setBotEquation] = useState<EquationTerm[]>([]);
+  const [botReasoning, setBotReasoning] = useState<string>("");
   
   const [showHint, setShowHint] = useState(false);
   const [humanDrawsRemaining, setHumanDrawsRemaining] = useState(MAX_DRAWS);
@@ -68,6 +69,7 @@ export default function GameClient() {
     setHumanScore(0);
     setBotScore(0);
     setBotEquation([]);
+    setBotReasoning("");
     setWinner(null);
     setGameState('playerTurn');
     setShowHint(false);
@@ -159,6 +161,7 @@ export default function GameClient() {
   };
 
   const determineWinner = useCallback(() => {
+    if (gameState === 'ended') return;
     if (humanScore > botScore) {
       setWinner('human');
     } else if (botScore > humanScore) {
@@ -167,19 +170,25 @@ export default function GameClient() {
       setWinner('draw');
     }
     setGameState('ended');
-  }, [humanScore, botScore]);
+  }, [humanScore, botScore, gameState]);
   
   const executeBotTurn = useCallback(async () => {
-    // If the game state changes while the bot is "thinking", abort.
     if (gameState !== 'botTurn') {
-        setIsBotThinking(false);
-        return;
+      setIsBotThinking(false);
+      return;
     }
 
     setIsBotThinking(true);
     try {
       const botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
       
+      // Another check in case the game state changed while waiting for the AI
+      if (gameState !== 'botTurn') {
+        setIsBotThinking(false);
+        return;
+      }
+      setBotReasoning(botResponse.reasoning);
+
       switch(botResponse.action) {
         case 'play':
           const botEq = botResponse.equation;
@@ -191,11 +200,9 @@ export default function GameClient() {
             setBotEquation(botEq as EquationTerm[]);
             toast({
               title: "Bot Played an Equation!",
-              description: botResponse.reasoning,
             });
             determineWinner();
           } else {
-            // Bot failed to create a valid equation, treat as a pass
             toast({
               title: "Bot failed",
               description: "The bot tried to make a move but failed.",
@@ -215,7 +222,6 @@ export default function GameClient() {
             setBotDrawsRemaining(prev => prev - 1);
             toast({
               title: "Bot Drew a Card",
-              description: botResponse.reasoning,
             });
             // Rerun bot's turn after drawing
             setTimeout(() => executeBotTurn(), 1500); 
@@ -231,7 +237,6 @@ export default function GameClient() {
         case 'pass':
           toast({
             title: "Bot Passed",
-            description: botResponse.reasoning,
           });
           setBotScore(0);
           setBotFinalResult(0);
@@ -241,12 +246,15 @@ export default function GameClient() {
       }
     } catch (error) {
       console.error("Bot AI error:", error);
-      setBotScore(0); // Penalize bot for error
-      toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
-      determineWinner();
+      if (gameState === 'botTurn') { // Only act if it's still the bot's turn
+        setBotScore(0); // Penalize bot for error
+        toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
+        determineWinner();
+      }
     } finally {
-        // We set this regardless now, as the turn will either end or a new async call for the next turn is made.
-        setIsBotThinking(false);
+        if (gameState !== 'botTurn' || (botResponse && botResponse.action !== 'draw')) {
+            setIsBotThinking(false);
+        }
     }
   }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState]);
 
@@ -355,6 +363,9 @@ export default function GameClient() {
                   </>
                 ) : <p>Bot passed.</p>}
               </div>
+              {botReasoning && (
+                  <p className="text-sm text-muted-foreground italic mt-2">"{botReasoning}"</p>
+              )}
             </div>
           </div>
           <Button onClick={startGame} size="lg" className="mt-8">Play Again</Button>
