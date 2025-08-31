@@ -27,40 +27,54 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled;
 }
 
-export function generateTarget(): { target: number; cardsUsed: Card[] } {
-  const deck = shuffleDeck(createDeck());
+export function generateTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+  let currentDeck = [...deck];
   
-  const numberCards = deck.filter(c => typeof CARD_VALUES[c.rank] === 'number');
-  const operatorCards = deck.filter(c => typeof CARD_VALUES[c.rank] === 'string');
-
   let result: number | null = null;
   let cardsUsed: Card[] = [];
+  let equation: EquationTerm[] = [];
   
   while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
-      let numCard1 = numberCards[Math.floor(Math.random() * numberCards.length)];
-      let opCard = operatorCards[Math.floor(Math.random() * operatorCards.length)];
-      let numCard2 = numberCards[Math.floor(Math.random() * numberCards.length)];
+    currentDeck = shuffleDeck(createDeck()); // Start with a full deck each attempt
+    equation = [];
+    cardsUsed = [];
+    
+    // Get two number cards and one operator card from the deck
+    const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+    let numCard1 = currentDeck.splice(numIndex1, 1)[0];
+    
+    const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string');
+    const opCard = currentDeck.splice(opIndex, 1)[0];
 
-      let term1 = CARD_VALUES[numCard1.rank] as number;
-      const operator = CARD_VALUES[opCard.rank] as string;
-      let term3 = CARD_VALUES[numCard2.rank] as number;
+    const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+    let numCard2 = currentDeck.splice(numIndex2, 1)[0];
+    
+    let term1 = CARD_VALUES[numCard1.rank] as number;
+    const operator = CARD_VALUES[opCard.rank] as string;
+    let term3 = CARD_VALUES[numCard2.rank] as number;
 
-      if (operator === '-' && term1 < term3) {
-        // Swap to ensure bigger - smaller
-        [numCard1, numCard2] = [numCard2, numCard1];
-        [term1, term3] = [term3, term1];
-      }
-      
-      cardsUsed = [numCard1, opCard, numCard2];
-      
-      try {
-          result = new Function(`return ${term1} ${operator} ${term3}`)();
-      } catch (e) {
+    // Ensure subtraction is always positive
+    if (operator === '-' && term1 < term3) {
+      [numCard1, numCard2] = [numCard2, numCard1];
+      [term1, term3] = [term3, term1];
+    }
+    
+    cardsUsed = [numCard1, opCard, numCard2];
+    equation = [term1, operator, term3];
+
+    try {
+        const evalResult = evaluateEquation(equation);
+        if (typeof evalResult === 'number') {
+          result = evalResult;
+        } else {
           result = null;
-      }
+        }
+    } catch (e) {
+        result = null;
+    }
   }
 
-  return { target: result, cardsUsed };
+  return { target: result, cardsUsed, updatedDeck: currentDeck };
 }
 
 export function evaluateEquation(equation: EquationTerm[]): number | { error: string } {

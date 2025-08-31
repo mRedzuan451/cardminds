@@ -71,15 +71,16 @@ export default function GameClient() {
   }, []);
   
   const startNewRound = useCallback(() => {
-    const newDeck = shuffleDeck(createDeck());
-    const { target, cardsUsed } = generateTarget();
+    let freshDeck = shuffleDeck(createDeck());
+    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck);
     
     setTargetNumber(target);
     setTargetCards(cardsUsed);
+    freshDeck = updatedDeck;
 
-    setPlayer1Hand(newDeck.slice(0, 5));
-    setPlayer2Hand(newDeck.slice(5, 10));
-    setDeck(newDeck.slice(10));
+    setPlayer1Hand(freshDeck.slice(0, 5));
+    setPlayer2Hand(freshDeck.slice(5, 10));
+    setDeck(freshDeck.slice(10));
     
     setEquation([]);
     setUsedCardIndices(new Set());
@@ -394,14 +395,14 @@ export default function GameClient() {
       )}
       
       {isPlayerTurn && (
-        <Card className="shadow-lg sticky top-[88px] z-10 bg-card/90 backdrop-blur-sm">
-          <CardHeader className="p-3">
+        <Card className="shadow-lg sticky top-[88px] z-10 bg-card/90 backdrop-blur-sm p-3">
+          <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               {currentPlayer === 'Player 1' ? <User /> : <Users />}
               {currentPlayer}'s Turn
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 pt-0">
+          <CardContent className="p-0 pt-3">
             <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
