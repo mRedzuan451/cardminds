@@ -1,0 +1,38 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is a player in the game.
+    // TODO: This should be updated to use request.auth.uid once Firebase Auth is implemented.
+    function isPlayer(gameId, playerId) {
+      return get(/databases/$(database)/documents/games/$(gameId)).data.players.hasAny([playerId]);
+    }
+
+    match /games/{gameId} {
+      // Anyone can create a new game.
+      allow create: if true;
+
+      // Anyone can read the main game document to see lobby status, etc.
+      allow read: if true;
+
+      // Only players in the game can update it.
+      // TODO: Replace isPlayer check with a check against request.auth.uid for real security.
+      allow update: if true; // In a real app, you'd check if the user is a player.
+      
+      // Players collection
+      match /players/{playerId} {
+        // Anyone can join a game (create a player document for themselves).
+        allow create: if true;
+
+        // Players can only read their own data or data of other players in the same game.
+        allow read: if true; // For simplicity, allowing all players in game to read each other's data.
+
+        // A player can only update their own document.
+        // TODO: This should be locked down to request.auth.uid === playerId in a real app.
+        allow update: if true;
+      }
+    }
+  }
+}
