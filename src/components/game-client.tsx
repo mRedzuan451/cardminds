@@ -67,14 +67,29 @@ export default function GameClient() {
   }, [currentPlayer]);
 
   const startNewGame = useCallback((mode: GameMode, numPlayers: number) => {
+    setGameState('initial');
     setGameMode(mode);
     setNumberOfPlayers(numPlayers);
     setCurrentRound(1);
     setShowConfetti(false);
-    startNewRound(mode, numPlayers);
+    
+    // Reset total scores for all players
+    const initialPlayers = Array.from({ length: numPlayers }, (_, i) => ({
+      id: i,
+      name: `Player ${i + 1}`,
+      hand: [],
+      roundScore: 0,
+      totalScore: 0, 
+      passed: false,
+      finalResult: 0,
+      equation: [],
+    }));
+    setPlayers(initialPlayers);
+
+    startNewRound(mode, numPlayers, initialPlayers);
   }, []);
   
-  const startNewRound = useCallback((mode: GameMode, numPlayers: number) => {
+  const startNewRound = useCallback((mode: GameMode, numPlayers: number, currentPlayers: Player[]) => {
     const deckCount = numPlayers > 4 ? 2 : 1;
     let freshDeck = shuffleDeck(createDeck(deckCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, mode);
@@ -83,33 +98,25 @@ export default function GameClient() {
     setTargetCards(cardsUsed);
     freshDeck = updatedDeck;
     
-    const initialPlayers: Player[] = [];
-    for (let i = 0; i < numPlayers; i++) {
+    const newPlayers = currentPlayers.map(p => {
         const hand = freshDeck.splice(0, 5);
-        initialPlayers.push({
-            id: i,
-            name: `Player ${i + 1}`,
-            hand,
-            roundScore: 0,
-            totalScore: (players[i]?.totalScore) || 0,
-            passed: false,
-            finalResult: 0,
-            equation: [],
-        });
-    }
+        return {
+          ...p,
+          hand,
+          roundScore: 0,
+          passed: false,
+          finalResult: 0,
+          equation: [],
+        }
+    });
 
-    setPlayers(initialPlayers);
-    
-    let remainingDeck = freshDeck;
-    
     // Player 1 automatically draws a card
-    if (remainingDeck.length > 0) {
-        const newPlayers = [...initialPlayers];
-        newPlayers[0].hand.push(remainingDeck.shift()!);
-        setPlayers(newPlayers);
+    if (freshDeck.length > 0) {
+        newPlayers[0].hand.push(freshDeck.shift()!);
     }
 
-    setDeck(remainingDeck);
+    setPlayers(newPlayers);
+    setDeck(freshDeck);
     
     setEquation([]);
     setUsedCardIndices(new Set());
@@ -117,7 +124,7 @@ export default function GameClient() {
     setShowHint(false);
     setCurrentPlayerIndex(0);
     setGameState('playerTurn');
-  }, [players]);
+  }, []);
 
   const handleParenthesisClick = (paren: '(' | ')') => {
     setEquation([...equation, paren]);
@@ -198,7 +205,9 @@ export default function GameClient() {
 
     setCurrentPlayerIndex(nextPlayerIndex);
     setGameState('playerTurn');
-    setShowTurnInterstitial(true);
+    if (numberOfPlayers > 1) {
+      setShowTurnInterstitial(true);
+    }
   };
 
   const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
@@ -206,19 +215,20 @@ export default function GameClient() {
     
     const updatedPlayers = players.map((p, index) => {
         if (index === currentPlayerIndex) {
-            return { ...p, roundScore: newScore, finalResult: result, equation: equation, passed: passed };
+            return { ...p, roundScore: newScore, finalResult: result, equation: passed ? [] : equation, passed: passed };
         }
         return p;
     });
 
     setPlayers(updatedPlayers);
 
+    if (updatedPlayers.every(p => p.passed)) {
+        handleAllPlayersPass();
+        return;
+    }
+
     if (currentPlayerIndex === numberOfPlayers - 1) { // Last player's turn
-        if (updatedPlayers.every(p => p.passed)) {
-            handleAllPlayersPass();
-        } else {
-            determineRoundWinner(updatedPlayers);
-        }
+        determineRoundWinner(updatedPlayers);
     } else {
         switchTurn();
     }
@@ -278,7 +288,7 @@ export default function GameClient() {
       setGameState('gameOver');
     } else {
       setCurrentRound(prev => prev + 1);
-      startNewRound(gameMode, numberOfPlayers);
+      startNewRound(gameMode, numberOfPlayers, players);
     }
   };
   
@@ -554,3 +564,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
