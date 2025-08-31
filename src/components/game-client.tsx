@@ -7,9 +7,18 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, SkipForward, X } from 'lucide-react';
+import { RefreshCw, Send, SkipForward, X, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type GameState = 'initial' | 'playing' | 'ended';
 
@@ -18,24 +27,28 @@ export default function GameClient() {
   const [deck, setDeck] = useState<CardType[]>([]);
   const [hand, setHand] = useState<Hand>([]);
   const [targetNumber, setTargetNumber] = useState<number>(0);
+  const [targetCards, setTargetCards] = useState<CardType[]>([]);
   const [equation, setEquation] = useState<EquationTerm[]>([]);
   const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
   const [score, setScore] = useState<number>(0);
   const [finalResult, setFinalResult] = useState<number>(0);
+  const [showHint, setShowHint] = useState(false);
   
   const { toast } = useToast();
 
   const startGame = useCallback(() => {
     const newDeck = shuffleDeck(createDeck());
-    const { target } = generateTarget();
+    const { target, cardsUsed } = generateTarget();
     
     setTargetNumber(target);
+    setTargetCards(cardsUsed);
     setHand(newDeck.slice(0, 5));
     setDeck(newDeck.slice(5));
     setEquation([]);
     setUsedCardIndices(new Set());
     setScore(0);
     setGameState('playing');
+    setShowHint(false);
   }, []);
 
   useEffect(() => {
@@ -101,6 +114,11 @@ export default function GameClient() {
   const equationString = useMemo(() => equation.map((term, i) => (
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
   )), [equation]);
+  
+  const targetEquation = useMemo(() => {
+    if (!targetCards || targetCards.length === 0) return null;
+    return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
+  }, [targetCards]);
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
@@ -109,8 +127,12 @@ export default function GameClient() {
           <CardHeader className="p-0 mb-1">
             <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 flex items-center gap-2">
             <p className="text-5xl font-bold text-primary">{targetNumber}</p>
+            <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
+              <Lightbulb className="h-6 w-6" />
+              <span className="sr-only">Show hint</span>
+            </Button>
           </CardContent>
         </Card>
         <div className="flex-grow" />
@@ -118,6 +140,28 @@ export default function GameClient() {
           <RefreshCw className="mr-2 h-5 w-5"/> New Game
         </Button>
       </div>
+
+      <AlertDialog open={showHint} onOpenChange={setShowHint}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-headline text-2xl">Target Combination</AlertDialogTitle>
+            <AlertDialogDescription>
+              Here's how the target number was created:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-center items-center gap-2 my-4">
+              {targetCards.map((card, index) => (
+                <GameCard key={index} card={card} />
+              ))}
+          </div>
+          <p className="text-center text-2xl font-bold">
+            {targetEquation} = <span className="text-primary">{targetNumber}</span>
+          </p>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowHint(false)}>Got it!</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {gameState === 'ended' && (
         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
