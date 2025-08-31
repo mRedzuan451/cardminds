@@ -25,8 +25,6 @@ import { Skeleton } from './ui/skeleton';
 type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'ended';
 type Player = 'human' | 'bot';
 
-const MAX_DRAWS = 3;
-
 export default function GameClient() {
   const [gameState, setGameState] = useState<GameState>('initial');
   const [deck, setDeck] = useState<CardType[]>([]);
@@ -45,8 +43,6 @@ export default function GameClient() {
   const [botReasoning, setBotReasoning] = useState<string>("");
   
   const [showHint, setShowHint] = useState(false);
-  const [humanDrawsRemaining, setHumanDrawsRemaining] = useState(MAX_DRAWS);
-  const [botDrawsRemaining, setBotDrawsRemaining] = useState(MAX_DRAWS);
   
   const [winner, setWinner] = useState<Player | 'draw' | null>(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
@@ -73,8 +69,6 @@ export default function GameClient() {
     setWinner(null);
     setGameState('playerTurn');
     setShowHint(false);
-    setHumanDrawsRemaining(MAX_DRAWS);
-    setBotDrawsRemaining(MAX_DRAWS);
   }, []);
 
   useEffect(() => {
@@ -138,27 +132,6 @@ export default function GameClient() {
       endPlayerTurn(result, usedCardIndices.size);
     }
   };
-  
-  const handlePassAndDraw = () => {
-    if (gameState !== 'playerTurn') return;
-    if (humanDrawsRemaining <= 0) {
-      toast({ title: "No draws left!", description: "You cannot draw any more cards this round.", variant: "destructive" });
-      return;
-    }
-    if (deck.length === 0) {
-      toast({ title: "No cards left!", description: "The deck is empty." });
-      return;
-    }
-    if (humanHand.length >= 10) {
-      toast({ title: "Hand is full!", description: "You can't have more than 10 cards." });
-      return;
-    }
-    const [newCard, ...restOfDeck] = deck;
-    setHumanHand([...humanHand, newCard]);
-    setDeck(restOfDeck);
-    setHumanDrawsRemaining(humanDrawsRemaining - 1);
-    toast({ title: "Drew a Card", description: "You drew a new card." });
-  };
 
   const determineWinner = useCallback(() => {
     if (gameState === 'ended') return;
@@ -174,16 +147,14 @@ export default function GameClient() {
   
   const executeBotTurn = useCallback(async () => {
     if (gameState !== 'botTurn') {
-      setIsBotThinking(false);
       return;
     }
 
     setIsBotThinking(true);
     let botResponse: BotOutput | null = null;
     try {
-      botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
+      botResponse = await findBestEquation({ hand: botHand, target: targetNumber });
       
-      // Another check in case the game state changed while waiting for the AI
       if (gameState !== 'botTurn') {
         setIsBotThinking(false);
         return;
@@ -199,58 +170,36 @@ export default function GameClient() {
             setBotScore(score);
             setBotFinalResult(evaluation);
             setBotEquation(botEq as EquationTerm[]);
-            determineWinner();
           } else {
             setBotScore(0);
             setBotFinalResult(0);
             setBotEquation([]);
-            determineWinner();
-          }
-          break;
-        case 'draw':
-          if (botDrawsRemaining > 0 && deck.length > 0 && botHand.length < 10) {
-            const [newCard, ...restOfDeck] = deck;
-            setBotHand(prevHand => [...prevHand, newCard]);
-            setDeck(restOfDeck);
-            setBotDrawsRemaining(prev => prev - 1);
-            // Rerun bot's turn after drawing
-            setTimeout(() => executeBotTurn(), 1500); 
-          } else {
-            // Cannot draw, so just pass
-            setBotScore(0);
-            setBotFinalResult(0);
-            setBotEquation([]);
-            determineWinner();
           }
           break;
         case 'pass':
           setBotScore(0);
           setBotFinalResult(0);
           setBotEquation([]);
-          determineWinner();
           break;
       }
     } catch (error) {
       console.error("Bot AI error:", error);
-      if (gameState === 'botTurn') { // Only act if it's still the bot's turn
-        setBotScore(0); // Penalize bot for error
+      if (gameState === 'botTurn') {
         toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
-        determineWinner();
+        setBotScore(0);
       }
     } finally {
-        if (gameState !== 'botTurn' || (botResponse && botResponse.action !== 'draw')) {
+        determineWinner();
+        if (gameState !== 'initial') {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState, toast]);
+  }, [botHand, targetNumber, determineWinner, gameState, toast]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
-      setIsBotThinking(true);
       const timer = setTimeout(() => executeBotTurn(), 1500); // Give a slight delay for realism
       return () => clearTimeout(timer);
-    } else {
-      setIsBotThinking(false);
     }
   }, [gameState, executeBotTurn]);
 
@@ -340,9 +289,9 @@ export default function GameClient() {
             <div className='space-y-2'>
               <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Bot /> Bot Score: <span className="text-destructive">{botScore}</span></h3>
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
+                Bot's equation:
                 {botEquation.length > 0 ? (
                   <>
-                  Bot's equation:
                   {botEquationString}
                   <span className="mx-2">=</span>
                   <span className="font-bold text-accent">{botFinalResult}</span>
@@ -377,12 +326,8 @@ export default function GameClient() {
                   <LogOut className="mr-2 h-4 w-4"/> Pass Turn
                 </Button>
               )}
-              <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={humanDrawsRemaining <= 0}>
-                <SkipForward className="mr-2 h-4 w-4"/> Draw Card <Badge variant="outline" className="ml-2">{humanDrawsRemaining} left</Badge>
-              </Button>
-              <Button onClick={handleClearEquation} variant="destructive" size="icon" disabled={equation.length === 0}>
-                <X className="h-4 w-4"/>
-                <span className="sr-only">Clear equation</span>
+               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow col-start-3" disabled={equation.length === 0}>
+                <X className="mr-2 h-4 w-4"/> Clear
               </Button>
             </div>
           </CardContent>
