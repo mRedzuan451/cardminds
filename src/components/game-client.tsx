@@ -198,8 +198,11 @@ export default function GameClient() {
   };
 
   const determineRoundWinner = useCallback(() => {
-    setPlayer1TotalScore(prev => prev + player1RoundScore);
-    setPlayer2TotalScore(prev => prev + player2RoundScore);
+    const p1Total = player1TotalScore + player1RoundScore;
+    const p2Total = player2TotalScore + player2RoundScore;
+    
+    setPlayer1TotalScore(p1Total);
+    setPlayer2TotalScore(p2Total);
 
     if (player1RoundScore > player2RoundScore) {
       setRoundWinner('Player 1');
@@ -211,9 +214,7 @@ export default function GameClient() {
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
-      const p1Final = player1TotalScore + player1RoundScore;
-      const p2Final = player2TotalScore + player2RoundScore;
-      if (p1Final > p2Final) {
+      if (p1Total > p2Total) {
         setShowConfetti(true);
       }
     } else {
@@ -390,31 +391,31 @@ export default function GameClient() {
       )}
       
       {isPlayerTurn && (
-        <Card className="shadow-lg sticky top-[100px] z-10 bg-card/90 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2">
+        <Card className="shadow-lg sticky top-[88px] z-10 bg-card/90 backdrop-blur-sm">
+          <CardHeader className="p-3">
+            <CardTitle className="font-headline flex items-center gap-2 text-xl">
               {currentPlayer === 'Player 1' ? <User /> : <Users />}
               {currentPlayer}'s Turn
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 bg-muted p-4 rounded-lg min-h-[72px] text-2xl font-bold flex-wrap">
-              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build an equation, or pass your turn.</span>}
+          <CardContent className="p-3 pt-0">
+            <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
+              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
               {equation.length >= 3 ? (
-                <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1">
-                  <Send className="mr-2 h-4 w-4"/> Submit Equation
+                <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1" size="sm">
+                  <Send className="mr-2 h-4 w-4"/> Submit
                 </Button>
               ) : (
-                <Button onClick={handlePass} className="flex-grow col-span-2 md:col-span-1" variant="secondary">
-                  <LogOut className="mr-2 h-4 w-4"/> Pass Turn
+                <Button onClick={handlePass} className="flex-grow col-span-2 md:col-span-1" variant="secondary" size="sm">
+                  <LogOut className="mr-2 h-4 w-4"/> Pass
                 </Button>
               )}
-               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0}>
+               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
                 <X className="mr-2 h-4 w-4"/> Clear
               </Button>
-              <Button onClick={handleDrawCard} variant="outline" className="flex-grow" disabled={drawsLeft <= 0 || deck.length === 0}>
+              <Button onClick={handleDrawCard} variant="outline" className="flex-grow" disabled={drawsLeft <= 0 || deck.length === 0} size="sm">
                 <FilePlus className="mr-2 h-4 w-4" /> Draw ({drawsLeft})
               </Button>
             </div>
@@ -450,5 +451,3 @@ export default function GameClient() {
     </div>
   );
 }
-
-    
