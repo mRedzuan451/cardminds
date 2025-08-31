@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, SkipForward, X, Lightbulb, Bot, User, LogOut } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, Bot, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -63,12 +63,15 @@ export default function GameClient() {
     setEquation([]);
     setUsedCardIndices(new Set());
     setHumanScore(0);
+    setHumanFinalResult(0);
     setBotScore(0);
+    setBotFinalResult(0);
     setBotEquation([]);
     setBotReasoning("");
     setWinner(null);
     setGameState('playerTurn');
     setShowHint(false);
+    setIsBotThinking(false);
   }, []);
 
   useEffect(() => {
@@ -105,7 +108,6 @@ export default function GameClient() {
   const handlePass = () => {
     if (gameState !== 'playerTurn') return;
     endPlayerTurn(0, 0);
-    toast({ title: "You Passed", description: "Your turn has ended. Bot is now playing." });
   };
   
   const handleSubmitEquation = () => {
@@ -133,17 +135,16 @@ export default function GameClient() {
     }
   };
 
-  const determineWinner = useCallback(() => {
-    if (gameState === 'ended') return;
-    if (humanScore > botScore) {
+  const determineWinner = useCallback((currentHumanScore: number, currentBotScore: number) => {
+    if (currentHumanScore > currentBotScore) {
       setWinner('human');
-    } else if (botScore > humanScore) {
+    } else if (currentBotScore > currentHumanScore) {
       setWinner('bot');
     } else {
       setWinner('draw');
     }
     setGameState('ended');
-  }, [humanScore, botScore, gameState]);
+  }, []);
   
   const executeBotTurn = useCallback(async () => {
     if (gameState !== 'botTurn') {
@@ -154,47 +155,46 @@ export default function GameClient() {
     let botResponse: BotOutput | null = null;
     try {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber });
-      
+
       if (gameState !== 'botTurn') {
         setIsBotThinking(false);
         return;
       }
-      setBotReasoning(botResponse.reasoning);
+      
+      let currentBotScore = 0;
+      let currentBotResult = 0;
+      let currentBotEquation: EquationTerm[] = [];
 
-      switch(botResponse.action) {
-        case 'play':
-          const botEq = botResponse.equation;
-          const evaluation = evaluateEquation(botEq as EquationTerm[]);
-          if (typeof evaluation === 'number') {
-            const score = calculateScore(evaluation, targetNumber, botEq.length);
-            setBotScore(score);
-            setBotFinalResult(evaluation);
-            setBotEquation(botEq as EquationTerm[]);
-          } else {
-            setBotScore(0);
-            setBotFinalResult(0);
-            setBotEquation([]);
-          }
-          break;
-        case 'pass':
-          setBotScore(0);
-          setBotFinalResult(0);
-          setBotEquation([]);
-          break;
+      if (botResponse.action === 'play' && botResponse.equation.length > 0) {
+        const botEq = botResponse.equation as EquationTerm[];
+        const evaluation = evaluateEquation(botEq);
+        if (typeof evaluation === 'number') {
+          currentBotScore = calculateScore(evaluation, targetNumber, botEq.length);
+          currentBotResult = evaluation;
+          currentBotEquation = botEq;
+        }
       }
+      
+      setBotScore(currentBotScore);
+      setBotFinalResult(currentBotResult);
+      setBotEquation(currentBotEquation);
+      setBotReasoning(botResponse.reasoning);
+      
+      determineWinner(humanScore, currentBotScore);
+
     } catch (error) {
       console.error("Bot AI error:", error);
       if (gameState === 'botTurn') {
         toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
         setBotScore(0);
+        determineWinner(humanScore, 0);
       }
     } finally {
-        determineWinner();
         if (gameState !== 'initial') {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, determineWinner, gameState, toast]);
+  }, [botHand, targetNumber, determineWinner, gameState, toast, humanScore]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
@@ -268,7 +268,7 @@ export default function GameClient() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {gameState === 'ended' && (
+      {(gameState === 'ended' && !isBotThinking) && (
         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
           <CardTitle className="text-4xl font-headline mb-4">Round Over!</CardTitle>
           {renderWinner()}
@@ -381,3 +381,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
