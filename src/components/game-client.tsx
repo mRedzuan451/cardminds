@@ -112,7 +112,7 @@ export default function GameClient() {
   const handleSubmitEquation = () => {
     if (gameState !== 'playerTurn' || equation.length === 0) return;
 
-    if (equation.length > 0 && equation.length < 3) {
+    if (equation.length > 0 && typeof CARD_VALUES[humanHand[Array.from(usedCardIndices)[0]].rank] === 'number' && equation.length < 3) {
       toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
       return;
     }
@@ -287,16 +287,20 @@ export default function GameClient() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
             <div className='space-y-2'>
               <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> Your Score: <span className="text-primary">{humanScore}</span></h3>
-              <div className="flex items-center justify-center gap-2 flex-wrap">
+              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 Your equation:
-                {equationString}
-                <span className="mx-2">=</span>
-                <span className="font-bold text-accent">{humanFinalResult}</span>
+                {equation.length > 0 ? (
+                  <>
+                  {equationString}
+                  <span className="mx-2">=</span>
+                  <span className="font-bold text-accent">{humanFinalResult}</span>
+                  </>
+                ) : <p>You passed.</p>}
               </div>
             </div>
             <div className='space-y-2'>
               <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Bot /> Bot Score: <span className="text-destructive">{botScore}</span></h3>
-              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[36px]">
+              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 {botEquation.length > 0 ? (
                   <>
                   Bot's equation:
@@ -390,5 +394,3 @@ export default function GameClient() {
     </div>
   );
 }
-
-    

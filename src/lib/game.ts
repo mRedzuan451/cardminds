@@ -36,20 +36,25 @@ export function generateTarget(): { target: number; cardsUsed: Card[] } {
   let result: number | null = null;
   let cardsUsed: Card[] = [];
   
-  while (result === null || !Number.isInteger(result) || result < 1 || result > 100) {
-      cardsUsed = [
-          numberCards[Math.floor(Math.random() * numberCards.length)],
-          operatorCards[Math.floor(Math.random() * operatorCards.length)],
-          numberCards[Math.floor(Math.random() * numberCards.length)],
-      ];
+  while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
+      let numCard1 = numberCards[Math.floor(Math.random() * numberCards.length)];
+      let opCard = operatorCards[Math.floor(Math.random() * operatorCards.length)];
+      let numCard2 = numberCards[Math.floor(Math.random() * numberCards.length)];
 
-      const [c1, c2, c3] = cardsUsed;
-      const term1 = CARD_VALUES[c1.rank];
-      const term2 = CARD_VALUES[c2.rank];
-      const term3 = CARD_VALUES[c3.rank];
+      let term1 = CARD_VALUES[numCard1.rank] as number;
+      const operator = CARD_VALUES[opCard.rank] as string;
+      let term3 = CARD_VALUES[numCard2.rank] as number;
+
+      if (operator === '-' && term1 < term3) {
+        // Swap to ensure bigger - smaller
+        [numCard1, numCard2] = [numCard2, numCard1];
+        [term1, term3] = [term3, term1];
+      }
+      
+      cardsUsed = [numCard1, opCard, numCard2];
       
       try {
-          result = new Function(`return ${term1} ${term2} ${term3}`)();
+          result = new Function(`return ${term1} ${operator} ${term3}`)();
       } catch (e) {
           result = null;
       }
@@ -82,6 +87,7 @@ export function evaluateEquation(equation: EquationTerm[]): number | { error: st
 }
 
 export function calculateScore(result: number, target: number, cardsUsed: number): number {
+  if (result === 0 && cardsUsed === 0) return 0; // Score for passing
   const difference = Math.abs(result - target);
   if (difference === 0 && cardsUsed > 0) {
     return 1000 - (cardsUsed * 20);
