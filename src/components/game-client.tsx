@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDocument, useCollection } from 'react-firebase-hooks/firestore';
 import { doc, collection, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, EquationTerm, GameState, Game, Player } from '@/lib/types';
@@ -206,7 +206,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   
   const handleNewGameClick = async () => {
     try {
-      const newGameId = await createGame({ creatorName: localPlayerName });
+      const newGameId = await gameActions.createGame({ creatorName: localPlayerName });
       if (newGameId) {
         router.push(`/game/${newGameId}?player=${encodeURIComponent(localPlayerName)}`);
       }
@@ -487,3 +487,5 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
+
+    
