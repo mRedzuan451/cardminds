@@ -511,22 +511,26 @@ export default function GameClient() {
             <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className={cn("grid grid-cols-3 gap-2 mt-3", gameMode === 'pro' && 'grid-cols-5')}>
-              {gameMode === 'pro' && (
-                <>
-                  <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
-                  <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
-                </>
-              )}
-              <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length === 0}>
-                <Send className="mr-2 h-4 w-4"/> Submit
-              </Button>
-              <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
-                <LogOut className="mr-2 h-4 w-4"/> Pass
-              </Button>
-               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
-                <X className="mr-2 h-4 w-4"/> Clear
-              </Button>
+            <div className="flex items-center justify-between gap-2 mt-3">
+              <div className={cn("grid grid-cols-3 gap-2", gameMode === 'pro' && "grid-cols-2")}>
+                {gameMode === 'pro' && (
+                  <>
+                    <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
+                    <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length === 0}>
+                  <Send className="mr-2 h-4 w-4"/> Submit
+                </Button>
+                <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
+                  <LogOut className="mr-2 h-4 w-4"/> Pass
+                </Button>
+                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
+                  <X className="mr-2 h-4 w-4"/> Clear
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
