@@ -179,13 +179,17 @@ export default function GameClient() {
       setBotReasoning(botResponse.reasoning);
 
       if (botResponse.action === 'play' && botResponse.equation.length > 0) {
-        const botEq = botResponse.equation as EquationTerm[];
+        const botEqRaw = botResponse.equation;
+        const botEq = botEqRaw.map(term => typeof term === 'string' && CARD_VALUES[term as 'J' | 'Q' | 'K'] ? CARD_VALUES[term as 'J' | 'Q' | 'K'] : term) as EquationTerm[]
+
         const evaluation = evaluateEquation(botEq);
         let currentBotScore = 0;
         let currentBotResult = 0;
         if (typeof evaluation === 'number') {
           currentBotScore = calculateScore(evaluation, targetNumber, botEq.length);
           currentBotResult = evaluation;
+        } else {
+            console.error("Bot evaluation error:", evaluation.error);
         }
         setBotScore(currentBotScore);
         setBotFinalResult(currentBotResult);
@@ -207,6 +211,8 @@ export default function GameClient() {
         }
       } else { // 'pass'
         setBotScore(0);
+        setBotFinalResult(0);
+        setBotEquation([]);
         determineWinner(humanScore, 0);
       }
 
