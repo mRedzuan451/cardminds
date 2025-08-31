@@ -135,6 +135,32 @@ export default function GameClient() {
   };
   
   const determineRoundWinner = useCallback(() => {
+    if (player1Passed && player2Passed) {
+      toast({ title: "Both players passed!", description: "Drawing a new card for each player."});
+      let nextDeck = [...deck];
+      let p1Hand = [...player1Hand];
+      let p2Hand = [...player2Hand];
+
+      if (nextDeck.length > 0) {
+        p1Hand.push(nextDeck.shift()!);
+      }
+      if (nextDeck.length > 0) {
+        p2Hand.push(nextDeck.shift()!);
+      }
+      
+      setDeck(nextDeck);
+      setPlayer1Hand(p1Hand);
+      setPlayer2Hand(p2Hand);
+      
+      setEquation([]);
+      setUsedCardIndices(new Set());
+      setPlayer1Passed(false);
+      setPlayer2Passed(false);
+      setCurrentPlayer('Player 1');
+      setGameState('player1Turn');
+      return;
+    }
+    
     let winner: Player | 'draw' | null = null;
     const p1s = player1RoundScore;
     const p2s = player2RoundScore;
@@ -162,7 +188,7 @@ export default function GameClient() {
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore, player1TotalScore, player2TotalScore]);
+  }, [currentRound, player1RoundScore, player2RoundScore, player1TotalScore, player2TotalScore, player1Passed, player2Passed, deck, player1Hand, player2Hand]);
 
   const switchTurn = () => {
     setEquation([]);
