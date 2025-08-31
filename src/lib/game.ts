@@ -23,11 +23,13 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
     return mode === 'pro' ? PRO_CARD_VALUES : EASY_CARD_VALUES;
 }
 
-export function createDeck(): Card[] {
-  const deck: Card[] = [];
-  for (const suit of SUITS) {
-    for (const rank of RANKS) {
-      deck.push({ suit, rank });
+export function createDeck(deckCount = 1): Card[] {
+  let deck: Card[] = [];
+  for (let i = 0; i < deckCount; i++) {
+    for (const suit of SUITS) {
+      for (const rank of RANKS) {
+        deck.push({ suit, rank });
+      }
     }
   }
   return deck;

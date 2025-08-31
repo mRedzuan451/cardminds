@@ -1,3 +1,4 @@
+
 export type Suit = 'Spades' | 'Hearts' | 'Diamonds' | 'Clubs';
 export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
 
@@ -11,3 +12,14 @@ export type Hand = Card[];
 export type EquationTerm = number | string; // e.g., 5, '+', 10
 
 export type GameMode = 'easy' | 'pro';
+
+export interface Player {
+    id: number;
+    name: string;
+    hand: Hand;
+    roundScore: number;
+    totalScore: number;
+    passed: boolean;
+    finalResult: number;
+    equation: EquationTerm[];
+}
