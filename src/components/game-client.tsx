@@ -80,8 +80,8 @@ export default function GameClient() {
   };
   
   const handleSubmitEquation = () => {
-    if (equation.length === 0) {
-        toast({ title: "Empty Equation", description: "Please build an equation before submitting.", variant: 'destructive'});
+    if (equation.length < 3) {
+        toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
         return;
     }
 
