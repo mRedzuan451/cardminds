@@ -178,13 +178,12 @@ export default function GameClient() {
     setPlayer1TotalScore(nextP1Total);
     setPlayer2TotalScore(nextP2Total);
 
+    setGameState('roundOver');
+
     if (currentRound >= TOTAL_ROUNDS) {
-      setGameState('gameOver');
       if (nextP1Total > nextP2Total) {
         setShowConfetti(true);
       }
-    } else {
-      setGameState('roundOver');
     }
   }, [currentRound, player1TotalScore, player2TotalScore]);
 
@@ -262,11 +261,10 @@ export default function GameClient() {
   };
 
   const totalWinner = useMemo(() => {
-    if (gameState !== 'gameOver') return null;
     if (player1TotalScore > player2TotalScore) return 'Player 1';
     if (player2TotalScore > player1TotalScore) return 'Player 2';
     return 'draw';
-  }, [gameState, player1TotalScore, player2TotalScore]);
+  }, [player1TotalScore, player2TotalScore]);
 
   useEffect(() => {
     if (gameState === 'gameOver' && totalWinner === 'Player 1' && !showConfetti) {
@@ -276,8 +274,12 @@ export default function GameClient() {
 
 
   const handleNextRound = () => {
-    setCurrentRound(prev => prev + 1);
-    startNewRound();
+    if (currentRound >= TOTAL_ROUNDS) {
+      setGameState('gameOver');
+    } else {
+      setCurrentRound(prev => prev + 1);
+      startNewRound();
+    }
   };
 
   const equationString = useMemo(() => equation.map((term, i) => (
@@ -437,7 +439,9 @@ export default function GameClient() {
               </div>
             </div>
           </div>
-          <Button onClick={handleNextRound} size="lg" className="mt-8">Next Round</Button>
+          <Button onClick={handleNextRound} size="lg" className="mt-8">
+            {currentRound >= TOTAL_ROUNDS ? 'Show Final Results' : 'Next Round'}
+          </Button>
         </Card>
       )}
       
@@ -496,3 +500,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
