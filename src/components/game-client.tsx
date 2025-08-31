@@ -189,14 +189,20 @@ export default function GameClient() {
   }, [currentRound, humanTotalScore, botTotalScore]);
   
   const executeBotTurn = useCallback(async (isMounted: () => boolean) => {
-    if (!isMounted() || gameState !== 'botTurn') return;
+    if (!isMounted() || gameState !== 'botTurn') {
+      setIsBotThinking(false);
+      return;
+    };
 
     setIsBotThinking(true);
     let botResponse: BotOutput | null = null;
     try {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
-      if (!isMounted() || gameState !== 'botTurn') return;
+      if (!isMounted() || gameState !== 'botTurn') {
+        setIsBotThinking(false);
+        return;
+      }
       
       setBotReasoning(botResponse.reasoning);
 
@@ -486,3 +492,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
