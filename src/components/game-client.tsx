@@ -38,6 +38,7 @@ export default function GameClient() {
   
   const [player1RoundScore, setPlayer1RoundScore] = useState<number>(0);
   const [player1FinalResult, setPlayer1FinalResult] = useState<number>(0);
+  const [player1Equation, setPlayer1Equation] = useState<EquationTerm[]>([]);
   const [player2RoundScore, setPlayer2RoundScore] = useState<number>(0);
   const [player2FinalResult, setPlayer2FinalResult] = useState<number>(0);
   const [player2Equation, setPlayer2Equation] = useState<EquationTerm[]>([]);
@@ -84,6 +85,7 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
     setPlayer1RoundScore(0);
     setPlayer1FinalResult(0);
+    setPlayer1Equation([]);
     setPlayer2RoundScore(0);
     setPlayer2FinalResult(0);
     setPlayer2Equation([]);
@@ -140,13 +142,12 @@ export default function GameClient() {
     if (currentPlayer === 'Player 1') {
       setPlayer1RoundScore(newScore);
       setPlayer1FinalResult(result);
-      // It's not Player 2's turn yet, we need to save p1's equation and then switch
-      setPlayer2Equation(equation); // This is a bit of a hack, we save P1's eq here
+      setPlayer1Equation(equation);
       switchTurn();
     } else { // Player 2
       setPlayer2RoundScore(newScore);
       setPlayer2FinalResult(result);
-      // Now that P2 is done, we can determine the winner
+      setPlayer2Equation(equation);
       determineRoundWinner();
     }
   };
@@ -198,11 +199,8 @@ export default function GameClient() {
   };
 
   const determineRoundWinner = useCallback(() => {
-    const p1Total = player1TotalScore + player1RoundScore;
-    const p2Total = player2TotalScore + player2RoundScore;
-    
-    setPlayer1TotalScore(p1Total);
-    setPlayer2TotalScore(p2Total);
+    setPlayer1TotalScore(prev => prev + player1RoundScore);
+    setPlayer2TotalScore(prev => prev + player2RoundScore);
 
     if (player1RoundScore > player2RoundScore) {
       setRoundWinner('Player 1');
@@ -214,13 +212,18 @@ export default function GameClient() {
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
-      if (p1Total > p2Total) {
-        setShowConfetti(true);
-      }
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore, player1TotalScore, player2TotalScore]);
+  }, [currentRound, player1RoundScore, player2RoundScore]);
+
+  useEffect(() => {
+    if (gameState === 'gameOver') {
+      if (player1TotalScore > player2TotalScore) {
+        setShowConfetti(true);
+      }
+    }
+  }, [gameState, player1TotalScore, player2TotalScore]);
 
   const handleNextRound = () => {
     setCurrentRound(prev => prev + 1);
@@ -231,13 +234,13 @@ export default function GameClient() {
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
   )), [equation]);
   
-  const player1EquationString = useMemo(() => player2Equation.map((term, i) => (
+  const player1EquationString = useMemo(() => player1Equation.map((term, i) => (
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
+  )), [player1Equation]);
+
+  const player2EquationString = useMemo(() => player2Equation.map((term, i) => (
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
   )), [player2Equation]);
-
-  const player2EquationString = useMemo(() => equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
-  )), [equation]);
 
   const targetEquation = useMemo(() => {
     if (!targetCards || targetCards.length === 0) return null;
