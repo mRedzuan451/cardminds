@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { findBestEquation } from '@/ai/flows/bot-flow';
+import { BotOutput, findBestEquation } from '@/ai/flows/bot-flow';
 import { Skeleton } from './ui/skeleton';
 
 type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'ended';
@@ -179,8 +179,9 @@ export default function GameClient() {
     }
 
     setIsBotThinking(true);
+    let botResponse: BotOutput | null = null;
     try {
-      const botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
+      botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
       
       // Another check in case the game state changed while waiting for the AI
       if (gameState !== 'botTurn') {
@@ -198,16 +199,8 @@ export default function GameClient() {
             setBotScore(score);
             setBotFinalResult(evaluation);
             setBotEquation(botEq as EquationTerm[]);
-            toast({
-              title: "Bot Played an Equation!",
-            });
             determineWinner();
           } else {
-            toast({
-              title: "Bot failed",
-              description: "The bot tried to make a move but failed.",
-              variant: "destructive"
-            });
             setBotScore(0);
             setBotFinalResult(0);
             setBotEquation([]);
@@ -220,14 +213,10 @@ export default function GameClient() {
             setBotHand(prevHand => [...prevHand, newCard]);
             setDeck(restOfDeck);
             setBotDrawsRemaining(prev => prev - 1);
-            toast({
-              title: "Bot Drew a Card",
-            });
             // Rerun bot's turn after drawing
             setTimeout(() => executeBotTurn(), 1500); 
           } else {
             // Cannot draw, so just pass
-            toast({ title: "Bot Passed", description: "Bot wanted to draw but couldn't." });
             setBotScore(0);
             setBotFinalResult(0);
             setBotEquation([]);
@@ -235,9 +224,6 @@ export default function GameClient() {
           }
           break;
         case 'pass':
-          toast({
-            title: "Bot Passed",
-          });
           setBotScore(0);
           setBotFinalResult(0);
           setBotEquation([]);
@@ -256,7 +242,7 @@ export default function GameClient() {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState]);
+  }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState, toast]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
