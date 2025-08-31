@@ -87,11 +87,11 @@ export default function GameClient() {
     setBotEquation([]);
     setBotReasoning("");
     setRoundWinner(null);
-    setGameState('playerTurn');
     setShowHint(false);
     setIsBotThinking(false);
     setHumanDrawsLeft(MAX_DRAWS);
     setBotDrawsLeft(MAX_DRAWS);
+    setGameState('playerTurn');
   }, []);
 
 
