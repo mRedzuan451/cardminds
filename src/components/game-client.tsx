@@ -115,13 +115,13 @@ export default function GameClient() {
   const handleSubmitEquation = () => {
     if (gameState !== 'playerTurn' || equation.length === 0) return;
 
-    if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
-      toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
+    if (equation.filter(term => typeof term === 'string').length === 0) {
+      toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
       return;
     }
 
-    if (equation.filter(term => typeof term === 'string').length === 0) {
-      toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
+    if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
+      toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
       return;
     }
 
@@ -170,6 +170,12 @@ export default function GameClient() {
   }, [humanScore, botScore]);
   
   const executeBotTurn = useCallback(async () => {
+    // If the game state changes while the bot is "thinking", abort.
+    if (gameState !== 'botTurn') {
+        setIsBotThinking(false);
+        return;
+    }
+
     setIsBotThinking(true);
     try {
       const botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
@@ -239,9 +245,8 @@ export default function GameClient() {
       toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
       determineWinner();
     } finally {
-      if (gameState !== 'botTurn') {
+        // We set this regardless now, as the turn will either end or a new async call for the next turn is made.
         setIsBotThinking(false);
-      }
     }
   }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState]);
 
