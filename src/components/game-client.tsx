@@ -180,11 +180,13 @@ export default function GameClient() {
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
-      setShowConfetti(true);
+      if (humanTotalScore + currentHumanScore > botTotalScore + currentBotScore) {
+        setShowConfetti(true);
+      }
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound]);
+  }, [currentRound, humanTotalScore, botTotalScore]);
   
   const executeBotTurn = useCallback(async (isMounted: () => boolean) => {
     if (!isMounted() || gameState !== 'botTurn') return;
@@ -295,7 +297,7 @@ export default function GameClient() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
-      {showConfetti && totalWinner && totalWinner !== 'draw' && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
+      {showConfetti && totalWinner === 'human' && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
         <Card className="text-center p-4 shadow-lg w-full md:w-auto">
           <CardHeader className="p-0 mb-1">
