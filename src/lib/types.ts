@@ -9,3 +9,5 @@ export interface Card {
 export type Hand = Card[];
 
 export type EquationTerm = number | string; // e.g., 5, '+', 10
+
+export type GameMode = 'easy' | 'pro';

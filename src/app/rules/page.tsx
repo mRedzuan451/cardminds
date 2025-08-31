@@ -26,19 +26,20 @@ export default function RulesPage() {
 
           <section>
             <h2 className="text-2xl font-bold mb-2 font-headline">Card Values</h2>
-            <p>Most cards represent their number value. Face cards, however, represent operators or the number one:</p>
+            <p>Most cards represent their number value. Face cards, however, have special values depending on the game mode:</p>
             <div className="flex flex-wrap gap-4 my-4 justify-center">
-              <GameCard card={{ suit: 'Spades', rank: 'J' }} />
-              <GameCard card={{ suit: 'Hearts', rank: 'Q' }} />
-              <GameCard card={{ suit: 'Clubs', rank: 'K' }} />
-              <GameCard card={{ suit: 'Diamonds', rank: 'A' }} />
+              <GameCard card={{ suit: 'Spades', rank: 'J' }} mode="easy" />
+              <GameCard card={{ suit: 'Hearts', rank: 'Q' }} mode="easy" />
+              <GameCard card={{ suit: 'Clubs', rank: 'K' }} mode="easy" />
+              <GameCard card={{ suit: 'Diamonds', rank: 'A' }} mode="easy" />
             </div>
             <ul className="list-disc list-inside space-y-1 bg-muted p-4 rounded-md">
               <li><span className="font-bold">2-10:</span> Face value</li>
               <li><span className="font-bold">Jack (J):</span> Addition (+)</li>
               <li><span className="font-bold">Queen (Q):</span> Subtraction (-)</li>
-              <li><span className="font-bold">King (K):</span> Division (/)</li>
               <li><span className="font-bold">Ace (A):</span> The number 1</li>
+              <li><span className="font-bold">King (K) in Easy Mode:</span> Multiplication (*)</li>
+              <li><span className="font-bold">King (K) in Pro Mode:</span> Division (/)</li>
             </ul>
             <p className="mt-4">
               In <strong>Pro Mode</strong>, multiplication must be done using parentheses, for example: (5+2)7 would be invalid, but (5+2)*7 is how you would do it.
@@ -66,9 +67,9 @@ export default function RulesPage() {
             <h2 className="text-2xl font-bold mb-2 font-headline">Game Modes</h2>
             <div className="space-y-2">
               <h3 className="font-bold text-xl">Easy Mode</h3>
-              <p>A simpler mode where equations must alternate between numbers and operators.</p>
+              <p>A simpler mode where equations must alternate between numbers and operators. The King card is multiplication (*).</p>
               <h3 className="font-bold text-xl mt-2">Pro Mode</h3>
-              <p>A more complex mode where the target is generated from two concatenated cards (e.g. a 2 and 5 make a target of 25). Parentheses `()` can be used to group operations.</p>
+              <p>A more complex mode where the target is generated from two concatenated cards (e.g. a 2 and 5 make a target of 25). The King card is division (/). Parentheses `()` can be used to group operations.</p>
             </div>
           </section>
 

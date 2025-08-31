@@ -1,13 +1,27 @@
 
-import type { Suit, Rank, Card, EquationTerm } from './types';
+import type { Suit, Rank, Card, EquationTerm, GameMode } from './types';
 
 export const SUITS: Suit[] = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
 export const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-export const CARD_VALUES: Record<Rank, EquationTerm> = {
+const BASE_CARD_VALUES: Record<Rank, EquationTerm> = {
   'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-  'J': '+', 'Q': '-', 'K': '/',
+  'J': '+', 'Q': '-', 'K': '*'
 };
+
+export const PRO_CARD_VALUES: Record<Rank, EquationTerm> = {
+    ...BASE_CARD_VALUES,
+    'K': '/'
+};
+
+export const EASY_CARD_VALUES: Record<Rank, EquationTerm> = {
+    ...BASE_CARD_VALUES,
+    'K': '*'
+};
+
+export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
+    return mode === 'pro' ? PRO_CARD_VALUES : EASY_CARD_VALUES;
+}
 
 export function createDeck(): Card[] {
   const deck: Card[] = [];
@@ -32,6 +46,7 @@ function generateEasyTarget(deck: Card[]): { target: number; cardsUsed: Card[], 
     let currentDeck = [...deck];
     let result: number | null = null;
     let cardsUsed: Card[] = [];
+    const CARD_VALUES = getCardValues('easy');
     
     while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
         currentDeck = shuffleDeck(createDeck());
@@ -74,6 +89,7 @@ function generateEasyTarget(deck: Card[]): { target: number; cardsUsed: Card[], 
 
 function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   let currentDeck = [...deck];
+  const CARD_VALUES = getCardValues('pro');
   const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number');
   
   const card1Index = Math.floor(Math.random() * numberCards.length);

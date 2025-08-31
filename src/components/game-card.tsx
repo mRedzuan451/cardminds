@@ -1,16 +1,18 @@
 import { cn } from "@/lib/utils";
-import type { Card as CardType, Suit } from "@/lib/types";
-import { CARD_VALUES } from "@/lib/game";
+import type { Card as CardType, Suit, GameMode } from "@/lib/types";
+import { getCardValues } from "@/lib/game";
 import { SuitIcons } from "./icons";
 
 
 interface GameCardProps extends React.HTMLAttributes<HTMLDivElement> {
   card: CardType;
   isFaceDown?: boolean;
+  mode?: GameMode;
 }
 
-export function GameCard({ card, isFaceDown = false, className, ...props }: GameCardProps) {
+export function GameCard({ card, isFaceDown = false, className, mode = 'easy', ...props }: GameCardProps) {
   const { suit, rank } = card;
+  const CARD_VALUES = getCardValues(mode);
   const value = CARD_VALUES[rank];
   const Icon = SuitIcons[suit];
   const color = (suit === 'Hearts' || suit === 'Diamonds') ? 'text-red-600' : 'text-foreground';
@@ -37,7 +39,7 @@ export function GameCard({ card, isFaceDown = false, className, ...props }: Game
         <Icon className="h-4 w-4 md:h-5 md:w-5" />
       </div>
       <div className="self-center text-3xl md:text-4xl font-bold">
-        {value === '/' ? '÷' : value}
+        {value === '/' ? '÷' : value === '*' ? '×' : value}
       </div>
       <div className="flex flex-col items-end rotate-180">
         <div className="text-xl md:text-2xl font-bold">{rank}</div>

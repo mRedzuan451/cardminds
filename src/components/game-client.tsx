@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
-import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
-import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
+import type { Card as CardType, Hand, EquationTerm, GameMode } from '@/lib/types';
+import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, getCardValues } from '@/lib/game';
 import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
@@ -23,7 +23,6 @@ import {
 import Confetti from 'react-confetti';
 
 type GameState = 'initial' | 'modeSelection' | 'player1Turn' | 'player2Turn' | 'roundOver' | 'gameOver';
-type GameMode = 'easy' | 'pro';
 type Player = 'Player 1' | 'Player 2';
 const TOTAL_ROUNDS = 3;
 
@@ -61,6 +60,8 @@ export default function GameClient() {
   const [showTurnInterstitial, setShowTurnInterstitial] = useState(false);
 
   const { toast } = useToast();
+  
+  const CARD_VALUES = useMemo(() => getCardValues(gameMode), [gameMode]);
 
   const activeHand = useMemo(() => {
     return currentPlayer === 'Player 1' ? player1Hand : player2Hand;
@@ -299,19 +300,20 @@ export default function GameClient() {
   }
 
   const equationString = useMemo(() => equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
   )), [equation]);
   
   const player1EquationString = useMemo(() => player1Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
   )), [player1Equation]);
 
   const player2EquationString = useMemo(() => player2Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
   )), [player2Equation]);
 
   const targetEquation = useMemo(() => {
     if (!targetCards || targetCards.length === 0) return null;
+    const CARD_VALUES = getCardValues(gameMode);
     if (gameMode === 'easy') {
       return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
     }
@@ -408,7 +410,7 @@ export default function GameClient() {
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
               {targetCards.map((card, index) => (
-                <GameCard key={index} card={card} />
+                <GameCard key={index} card={card} mode={gameMode} />
               ))}
           </div>
            {targetEquation && (
@@ -548,6 +550,7 @@ export default function GameClient() {
                   <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
                     <GameCard
                       card={card}
+                      mode={gameMode}
                       onClick={() => handleCardClick(card, index)}
                       className={cn(
                         'transition-all duration-200',
