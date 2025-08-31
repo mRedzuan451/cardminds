@@ -3,6 +3,7 @@
 
 import GameClient from "@/components/game-client";
 import { useSearchParams } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 
 export default function GamePage({ params }: { params: { gameId: string } }) {
   const searchParams = useSearchParams();
@@ -10,7 +11,14 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
 
   if (!playerName) {
     // This can be a redirect to an error page or the home page
-    return <div>Player name is required to join a game.</div>;
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+                <RefreshCw className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-xl text-muted-foreground">Loading Player...</p>
+            </div>
+        </div>
+    );
   }
 
   return <GameClient gameId={params.gameId} playerName={playerName} />;
