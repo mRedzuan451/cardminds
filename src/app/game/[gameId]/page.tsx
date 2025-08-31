@@ -10,7 +10,6 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
   const playerName = searchParams.get('player');
 
   if (!playerName) {
-    // This can be a redirect to an error page or the home page
     return (
         <div className="flex h-screen items-center justify-center">
             <div className="flex flex-col items-center gap-4">
