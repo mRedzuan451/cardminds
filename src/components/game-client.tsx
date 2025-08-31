@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, Bot, User, LogOut } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, Bot, User, LogOut, FilePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -24,6 +24,7 @@ import { Skeleton } from './ui/skeleton';
 
 type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'ended';
 type Player = 'human' | 'bot';
+const MAX_DRAWS = 3;
 
 export default function GameClient() {
   const [gameState, setGameState] = useState<GameState>('initial');
@@ -43,6 +44,8 @@ export default function GameClient() {
   const [botReasoning, setBotReasoning] = useState<string>("");
   
   const [showHint, setShowHint] = useState(false);
+  const [humanDrawsLeft, setHumanDrawsLeft] = useState(MAX_DRAWS);
+  const [botDrawsLeft, setBotDrawsLeft] = useState(MAX_DRAWS);
   
   const [winner, setWinner] = useState<Player | 'draw' | null>(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
@@ -72,6 +75,8 @@ export default function GameClient() {
     setGameState('playerTurn');
     setShowHint(false);
     setIsBotThinking(false);
+    setHumanDrawsLeft(MAX_DRAWS);
+    setBotDrawsLeft(MAX_DRAWS);
   }, []);
 
   useEffect(() => {
@@ -105,13 +110,23 @@ export default function GameClient() {
     setGameState('botTurn');
   };
 
+  const handleDrawCard = () => {
+    if (gameState !== 'playerTurn' || humanDrawsLeft <= 0 || deck.length === 0) return;
+
+    const [newCard, ...restOfDeck] = deck;
+    setHumanHand([...humanHand, newCard]);
+    setDeck(restOfDeck);
+    setHumanDrawsLeft(humanDrawsLeft - 1);
+    toast({ title: "Card Drawn", description: "You drew a new card."});
+  };
+
   const handlePass = () => {
     if (gameState !== 'playerTurn') return;
     endPlayerTurn(0, 0);
   };
   
   const handleSubmitEquation = () => {
-    if (gameState !== 'playerTurn' || equation.length === 0) return;
+    if (gameState !== 'playerTurn' || equation.length < 3) return;
 
     if (equation.filter(term => typeof term === 'string').length === 0) {
       toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
@@ -154,33 +169,45 @@ export default function GameClient() {
     setIsBotThinking(true);
     let botResponse: BotOutput | null = null;
     try {
-      botResponse = await findBestEquation({ hand: botHand, target: targetNumber });
+      botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
-      if (gameState !== 'botTurn') {
-        setIsBotThinking(false);
+      if (gameState !== 'botTurn') { // Check again in case state changed during API call
         return;
       }
       
-      let currentBotScore = 0;
-      let currentBotResult = 0;
-      let currentBotEquation: EquationTerm[] = [];
+      setBotReasoning(botResponse.reasoning);
 
       if (botResponse.action === 'play' && botResponse.equation.length > 0) {
         const botEq = botResponse.equation as EquationTerm[];
         const evaluation = evaluateEquation(botEq);
+        let currentBotScore = 0;
+        let currentBotResult = 0;
         if (typeof evaluation === 'number') {
           currentBotScore = calculateScore(evaluation, targetNumber, botEq.length);
           currentBotResult = evaluation;
-          currentBotEquation = botEq;
         }
+        setBotScore(currentBotScore);
+        setBotFinalResult(currentBotResult);
+        setBotEquation(botEq);
+        determineWinner(humanScore, currentBotScore);
+      } else if (botResponse.action === 'draw') {
+        if (deck.length > 0 && botDrawsLeft > 0) {
+          const [newCard, ...restOfDeck] = deck;
+          setBotHand([...botHand, newCard]);
+          setDeck(restOfDeck);
+          setBotDrawsLeft(botDrawsLeft - 1);
+          
+          // Bot gets to think again after drawing
+          setTimeout(() => executeBotTurn(), 1000); 
+        } else {
+          // Can't draw, so just pass
+          setBotScore(0);
+          determineWinner(humanScore, 0);
+        }
+      } else { // 'pass'
+        setBotScore(0);
+        determineWinner(humanScore, 0);
       }
-      
-      setBotScore(currentBotScore);
-      setBotFinalResult(currentBotResult);
-      setBotEquation(currentBotEquation);
-      setBotReasoning(botResponse.reasoning);
-      
-      determineWinner(humanScore, currentBotScore);
 
     } catch (error) {
       console.error("Bot AI error:", error);
@@ -190,11 +217,11 @@ export default function GameClient() {
         determineWinner(humanScore, 0);
       }
     } finally {
-        if (gameState !== 'initial') {
+        if (gameState !== 'botTurn' || (botResponse && botResponse.action !== 'draw')) {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, determineWinner, gameState, toast, humanScore]);
+  }, [botHand, targetNumber, botDrawsLeft, determineWinner, gameState, toast, humanScore, deck]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
@@ -316,8 +343,8 @@ export default function GameClient() {
             <div className="flex items-center gap-2 bg-muted p-4 rounded-lg min-h-[72px] text-2xl font-bold flex-wrap">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build an equation, or pass your turn.</span>}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-              {equation.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+              {equation.length >= 3 ? (
                 <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1">
                   <Send className="mr-2 h-4 w-4"/> Submit Equation
                 </Button>
@@ -326,8 +353,11 @@ export default function GameClient() {
                   <LogOut className="mr-2 h-4 w-4"/> Pass Turn
                 </Button>
               )}
-               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow col-start-3" disabled={equation.length === 0}>
+               <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0}>
                 <X className="mr-2 h-4 w-4"/> Clear
+              </Button>
+              <Button onClick={handleDrawCard} variant="outline" className="flex-grow" disabled={humanDrawsLeft <= 0 || deck.length === 0}>
+                <FilePlus className="mr-2 h-4 w-4" /> Draw ({humanDrawsLeft})
               </Button>
             </div>
           </CardContent>
