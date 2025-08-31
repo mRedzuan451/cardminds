@@ -48,9 +48,9 @@ An equation must alternate between numbers and operators (e.g., 7 + 1). It must 
 
 Based on the hand of cards you are given and the target number, you must decide on the best possible move. Your options are:
 1.  **Play an Equation**: Find the combination of cards in your hand that forms an equation resulting in a number closest to the target. Your response should include this equation.
-2.  **Pass**: If you cannot form a valid equation, or if no equation gets you reasonably close to the target, you can choose to pass your turn.
+2.  **Pass**: If you absolutely cannot form any valid equation with the cards in your hand, you can choose to pass your turn. Otherwise, you should always play a move.
 
-Analyze your hand carefully. Evaluate different combinations. Return your decision as a structured JSON object. Provide a brief reasoning for your choice. For example, if you find a perfect solution, your reasoning might be "Found an equation that exactly matches the target." If you pass, it might be "No valid equations can be formed with the current hand."
+Analyze your hand carefully. Evaluate different combinations to find the one that minimizes the difference from the target. Return your decision as a structured JSON object. Provide a brief reasoning for your choice. For example, if you find a perfect solution, your reasoning might be "Found an equation that exactly matches the target." If you pass, it must be because "No valid equations can be formed with the current hand."
 `;
 
 const prompt = ai.definePrompt({
