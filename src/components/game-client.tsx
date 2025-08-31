@@ -42,6 +42,9 @@ export default function GameClient() {
   const [player2RoundScore, setPlayer2RoundScore] = useState<number>(0);
   const [player2FinalResult, setPlayer2FinalResult] = useState<number>(0);
   const [player2Equation, setPlayer2Equation] = useState<EquationTerm[]>([]);
+  
+  const [player1Passed, setPlayer1Passed] = useState(false);
+  const [player2Passed, setPlayer2Passed] = useState(false);
 
   const [currentPlayer, setCurrentPlayer] = useState<Player>('Player 1');
   
@@ -87,9 +90,11 @@ export default function GameClient() {
     setPlayer1RoundScore(0);
     setPlayer1FinalResult(0);
     setPlayer1Equation([]);
+    setPlayer1Passed(false);
     setPlayer2RoundScore(0);
     setPlayer2FinalResult(0);
     setPlayer2Equation([]);
+    setPlayer2Passed(false);
     setRoundWinner(null);
     setShowHint(false);
     setDrawsLeft(MAX_DRAWS);
@@ -124,16 +129,18 @@ export default function GameClient() {
   };
   
   const determineRoundWinner = useCallback((p1Score: number, p2Score: number) => {
+    let winner: Player | 'draw' | null = null;
+    if (p1Score > p2Score) {
+      winner = 'Player 1';
+    } else if (p2Score > p1Score) {
+      winner = 'Player 2';
+    } else {
+      winner = 'draw';
+    }
+    setRoundWinner(winner);
+
     setPlayer1TotalScore(prev => prev + p1Score);
     setPlayer2TotalScore(prev => prev + p2Score);
-
-    if (p1Score > p2Score) {
-      setRoundWinner('Player 1');
-    } else if (p2Score > p1Score) {
-      setRoundWinner('Player 2');
-    } else {
-      setRoundWinner('draw');
-    }
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
@@ -151,18 +158,20 @@ export default function GameClient() {
     setShowTurnInterstitial(true);
   };
 
-  const endPlayerTurn = (result: number, cardsUsedCount: number) => {
+  const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
     const newScore = calculateScore(result, targetNumber, cardsUsedCount);
 
     if (currentPlayer === 'Player 1') {
       setPlayer1RoundScore(newScore);
       setPlayer1FinalResult(result);
       setPlayer1Equation(equation);
+      setPlayer1Passed(passed);
       switchTurn();
     } else { // Player 2
       setPlayer2RoundScore(newScore);
       setPlayer2FinalResult(result);
       setPlayer2Equation(equation);
+      setPlayer2Passed(passed);
       determineRoundWinner(player1RoundScore, newScore);
     }
   };
@@ -184,7 +193,7 @@ export default function GameClient() {
 
   const handlePass = () => {
     if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
-    endPlayerTurn(0, 0);
+    endPlayerTurn(0, 0, true);
   };
   
   const handleSubmitEquation = () => {
@@ -209,7 +218,7 @@ export default function GameClient() {
     }
     
     if (typeof result === 'number') {
-      endPlayerTurn(result, usedCardIndices.size);
+      endPlayerTurn(result, usedCardIndices.size, false);
     }
   };
 
@@ -372,7 +381,7 @@ export default function GameClient() {
               <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> Player 1 Score: <span className="text-primary">{player1RoundScore}</span></h3>
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 Equation:
-                {player1RoundScore > 0 ? (
+                {!player1Passed ? (
                   <>
                   {player1EquationString}
                   <span className="mx-2">=</span>
@@ -385,7 +394,7 @@ export default function GameClient() {
               <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Users /> Player 2 Score: <span className="text-destructive">{player2RoundScore}</span></h3>
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 Equation:
-                {player2RoundScore > 0 ? (
+                {!player2Passed ? (
                   <>
                   {player2EquationString}
                   <span className="mx-2">=</span>
