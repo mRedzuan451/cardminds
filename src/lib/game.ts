@@ -1,3 +1,4 @@
+
 import type { Suit, Rank, Card, EquationTerm } from './types';
 
 export const SUITS: Suit[] = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
@@ -27,75 +28,100 @@ export function shuffleDeck(deck: Card[]): Card[] {
   return shuffled;
 }
 
-export function generateTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
-  let currentDeck = [...deck];
-  
-  let result: number | null = null;
-  let cardsUsed: Card[] = [];
-  let equation: EquationTerm[] = [];
-  
-  while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
-    currentDeck = shuffleDeck(createDeck()); // Start with a full deck each attempt
-    equation = [];
-    cardsUsed = [];
+function generateEasyTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+    let currentDeck = [...deck];
+    let result: number | null = null;
+    let cardsUsed: Card[] = [];
     
-    // Get two number cards and one operator card from the deck
-    const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
-    let numCard1 = currentDeck.splice(numIndex1, 1)[0];
-    
-    const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string');
-    const opCard = currentDeck.splice(opIndex, 1)[0];
+    while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
+        currentDeck = shuffleDeck(createDeck());
+        
+        const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+        let numCard1 = currentDeck.splice(numIndex1, 1)[0];
+        
+        const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string');
+        const opCard = currentDeck.splice(opIndex, 1)[0];
 
-    const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
-    let numCard2 = currentDeck.splice(numIndex2, 1)[0];
-    
-    let term1 = CARD_VALUES[numCard1.rank] as number;
-    const operator = CARD_VALUES[opCard.rank] as string;
-    let term3 = CARD_VALUES[numCard2.rank] as number;
+        const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+        let numCard2 = currentDeck.splice(numIndex2, 1)[0];
+        
+        let term1 = CARD_VALUES[numCard1.rank] as number;
+        const operator = CARD_VALUES[opCard.rank] as string;
+        let term3 = CARD_VALUES[numCard2.rank] as number;
 
-    // Ensure subtraction is always positive
-    if (operator === '-' && term1 < term3) {
-      [numCard1, numCard2] = [numCard2, numCard1];
-      [term1, term3] = [term3, term1];
-    }
-    
-    cardsUsed = [numCard1, opCard, numCard2];
-    equation = [term1, operator, term3];
-
-    try {
-        const evalResult = evaluateEquation(equation);
-        if (typeof evalResult === 'number') {
-          result = evalResult;
-        } else {
-          result = null;
+        if (operator === '-' && term1 < term3) {
+            [numCard1, numCard2] = [numCard2, numCard1];
+            [term1, term3] = [term3, term1];
         }
-    } catch (e) {
-        result = null;
-    }
-  }
+        
+        cardsUsed = [numCard1, opCard, numCard2];
+        const equation = [term1, operator, term3];
 
-  return { target: result, cardsUsed, updatedDeck: currentDeck };
+        try {
+            const evalResult = evaluateEquation(equation);
+            if (typeof evalResult === 'number') {
+                result = evalResult;
+            } else {
+                result = null;
+            }
+        } catch (e) {
+            result = null;
+        }
+    }
+
+    return { target: result, cardsUsed, updatedDeck: currentDeck };
+}
+
+function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+  let currentDeck = [...deck];
+  const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number');
+  
+  const card1Index = Math.floor(Math.random() * numberCards.length);
+  const card1 = numberCards[card1Index];
+  numberCards.splice(card1Index, 1);
+  
+  const card2Index = Math.floor(Math.random() * numberCards.length);
+  const card2 = numberCards[card2Index];
+
+  const val1 = CARD_VALUES[card1.rank] as number;
+  const val2 = CARD_VALUES[card2.rank] as number;
+
+  const target = parseInt(`${val1}${val2}`, 10);
+  const cardsUsed = [card1, card2];
+  
+  const updatedDeck = deck.filter(c => !cardsUsed.some(used => used.rank === c.rank && used.suit === c.suit));
+
+  return { target, cardsUsed, updatedDeck };
+}
+
+
+export function generateTarget(deck: Card[], mode: 'easy' | 'pro'): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+  if (mode === 'pro') {
+    return generateProTarget(deck);
+  }
+  return generateEasyTarget(deck);
 }
 
 export function evaluateEquation(equation: EquationTerm[]): number | { error: string } {
   if (equation.length === 0) return { error: "Equation is empty." };
-  
-  for (let i = 0; i < equation.length; i++) {
-    const term = equation[i];
-    const isEven = i % 2 === 0;
-    if (isEven && typeof term !== 'number') return { error: `Invalid equation: Expected a number at position ${i+1}.`};
-    if (!isEven && typeof term !== 'string') return { error: `Invalid equation: Expected an operator at position ${i+1}.`};
-  }
-  if (equation.length % 2 === 0) return { error: "Equation must end with a number." };
 
   const equationString = equation.join(' ');
   try {
+    // Basic validation to prevent arbitrary code execution
+    const safeCharsRegex = /^[0-9+\-*/().\s]+$/;
+    if (!safeCharsRegex.test(equationString)) {
+        return { error: 'Invalid characters in equation.' };
+    }
+
     const result = new Function(`return ${equationString}`)();
     if (typeof result !== 'number' || !isFinite(result)) {
       return { error: 'Invalid calculation result.' };
     }
     return result;
   } catch (e) {
+    if (e instanceof SyntaxError) {
+      return { error: 'Invalid mathematical expression: Check parentheses and operators.'}
+    }
     return { error: 'Invalid mathematical expression.' };
   }
 }
@@ -109,3 +135,5 @@ export function calculateScore(result: number, target: number, cardsUsed: number
   const score = Math.max(0, 500 - (difference * 10) - (cardsUsed * 20));
   return Math.round(score);
 }
+
+    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -7,7 +8,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -21,12 +22,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import Confetti from 'react-confetti';
 
-type GameState = 'initial' | 'player1Turn' | 'player2Turn' | 'roundOver' | 'gameOver';
+type GameState = 'initial' | 'modeSelection' | 'player1Turn' | 'player2Turn' | 'roundOver' | 'gameOver';
+type GameMode = 'easy' | 'pro';
 type Player = 'Player 1' | 'Player 2';
 const TOTAL_ROUNDS = 3;
 
 export default function GameClient() {
-  const [gameState, setGameState] = useState<GameState>('initial');
+  const [gameState, setGameState] = useState<GameState>('modeSelection');
+  const [gameMode, setGameMode] = useState<GameMode>('easy');
   const [deck, setDeck] = useState<CardType[]>([]);
   const [player1Hand, setPlayer1Hand] = useState<Hand>([]);
   const [player2Hand, setPlayer2Hand] = useState<Hand>([]);
@@ -63,17 +66,18 @@ export default function GameClient() {
     return currentPlayer === 'Player 1' ? player1Hand : player2Hand;
   }, [currentPlayer, player1Hand, player2Hand]);
 
-  const startNewGame = useCallback(() => {
+  const startNewGame = useCallback((mode: GameMode) => {
+    setGameMode(mode);
     setCurrentRound(1);
     setPlayer1TotalScore(0);
     setPlayer2TotalScore(0);
     setShowConfetti(false);
-    startNewRound();
+    startNewRound(mode);
   }, []);
   
-  const startNewRound = useCallback(() => {
+  const startNewRound = useCallback((mode: GameMode) => {
     let freshDeck = shuffleDeck(createDeck());
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck);
+    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, mode);
     
     setTargetNumber(target);
     setTargetCards(cardsUsed);
@@ -108,10 +112,9 @@ export default function GameClient() {
     setGameState('player1Turn');
   }, []);
 
-
-  useEffect(() => {
-    startNewGame();
-  }, [startNewGame]);
+  const handleParenthesisClick = (paren: '(' | ')') => {
+    setEquation([...equation, paren]);
+  };
 
   const handleCardClick = (card: CardType, index: number) => {
     if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
@@ -120,9 +123,11 @@ export default function GameClient() {
     const value = CARD_VALUES[card.rank];
     const lastTerm = equation.length > 0 ? equation[equation.length - 1] : null;
 
-    if ( (typeof value === 'number' && typeof lastTerm === 'number') || (typeof value === 'string' && typeof lastTerm === 'string')) {
-        toast({ title: "Invalid Move", description: "You must alternate between numbers and operators.", variant: "destructive" });
-        return;
+    if (gameMode === 'easy') {
+      if ( (typeof value === 'number' && typeof lastTerm === 'number') || (typeof value === 'string' && typeof lastTerm === 'string')) {
+          toast({ title: "Invalid Move", description: "You must alternate between numbers and operators.", variant: "destructive" });
+          return;
+      }
     }
     
     setEquation([...equation, value]);
@@ -162,7 +167,7 @@ export default function GameClient() {
 
   const determineRoundWinner = useCallback((p1s: number, p2s: number) => {
     let winner: Player | 'draw' | null = null;
-
+    
     if (p1s > p2s) {
       winner = 'Player 1';
     } else if (p2s > p1s) {
@@ -181,7 +186,7 @@ export default function GameClient() {
     setGameState('roundOver');
 
     if (currentRound >= TOTAL_ROUNDS) {
-      if (nextP1Total > nextP2Total) {
+      if (nextP1Total > nextP2Total && winner === 'Player 1') {
         setShowConfetti(true);
       }
     }
@@ -236,17 +241,19 @@ export default function GameClient() {
   
   const handleSubmitEquation = () => {
     if (gameState !== 'player1Turn' && gameState !== 'player2Turn') return;
-    if (equation.length < 3) return;
 
-    if (equation.filter(term => typeof term === 'string').length === 0) {
-      toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
-      return;
+    if (gameMode === 'easy') {
+      if (equation.length < 3) return;
+      if (equation.filter(term => typeof term === 'string').length === 0) {
+        toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
+        return;
+      }
+      if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
+        toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
+        return;
+      }
     }
 
-    if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
-      toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
-      return;
-    }
 
     const result = evaluateEquation(equation);
 
@@ -261,10 +268,11 @@ export default function GameClient() {
   };
 
   const totalWinner = useMemo(() => {
+    if (currentRound < TOTAL_ROUNDS && gameState !== 'gameOver') return 'draw';
     if (player1TotalScore > player2TotalScore) return 'Player 1';
     if (player2TotalScore > player1TotalScore) return 'Player 2';
     return 'draw';
-  }, [player1TotalScore, player2TotalScore]);
+  }, [player1TotalScore, player2TotalScore, currentRound, gameState]);
 
   useEffect(() => {
     if (gameState === 'gameOver' && totalWinner === 'Player 1' && !showConfetti) {
@@ -278,26 +286,34 @@ export default function GameClient() {
       setGameState('gameOver');
     } else {
       setCurrentRound(prev => prev + 1);
-      startNewRound();
+      startNewRound(gameMode);
     }
   };
+  
+  const handleNewGameClick = () => {
+    setGameState('modeSelection');
+  }
 
   const equationString = useMemo(() => equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
   )), [equation]);
   
   const player1EquationString = useMemo(() => player1Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
   )), [player1Equation]);
 
   const player2EquationString = useMemo(() => player2Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term}</Badge>
   )), [player2Equation]);
 
   const targetEquation = useMemo(() => {
     if (!targetCards || targetCards.length === 0) return null;
-    return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
-  }, [targetCards]);
+    if (gameMode === 'easy') {
+      return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
+    }
+    // For pro mode, just show the cards
+    return null;
+  }, [targetCards, gameMode]);
 
   const renderRoundWinner = () => {
     if (!roundWinner) return null;
@@ -309,6 +325,28 @@ export default function GameClient() {
   };
 
   const isPlayerTurn = gameState === 'player1Turn' || gameState === 'player2Turn';
+
+  if (gameState === 'modeSelection') {
+    return (
+      <div className="container mx-auto p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-150px)]">
+        <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+          <CardHeader>
+            <CardTitle className="text-4xl font-headline">Choose Your Mode</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col md:flex-row gap-4">
+            <Button onClick={() => startNewGame('easy')} size="lg" className="h-24 text-2xl w-full">
+              <Baby className="mr-4 h-8 w-8" />
+              Easy
+            </Button>
+            <Button onClick={() => startNewGame('pro')} size="lg" className="h-24 text-2xl w-full" variant="destructive">
+               <BrainCircuit className="mr-4 h-8 w-8" />
+               Pro
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
@@ -329,7 +367,7 @@ export default function GameClient() {
         </Card>
         
         <div className="w-full md:w-auto flex-grow flex flex-col items-center justify-center gap-4">
-            <Button onClick={startNewGame} size="lg" className="shadow-lg w-full max-w-xs">
+            <Button onClick={handleNewGameClick} size="lg" className="shadow-lg w-full max-w-xs">
               <RefreshCw className="mr-2 h-5 w-5"/> New Game
             </Button>
             <Card className="text-center p-4 shadow-lg w-full max-w-xs">
@@ -364,9 +402,16 @@ export default function GameClient() {
                 <GameCard key={index} card={card} />
               ))}
           </div>
-          <p className="text-center text-2xl font-bold">
-            {targetEquation} = <span className="text-primary">{targetNumber}</span>
-          </p>
+           {targetEquation && (
+            <p className="text-center text-2xl font-bold">
+              {targetEquation} = <span className="text-primary">{targetNumber}</span>
+            </p>
+          )}
+          {gameMode === 'pro' && (
+             <p className="text-center text-2xl font-bold">
+                Concatenated to form <span className="text-primary">{targetNumber}</span>
+             </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowHint(false)}>Got it!</AlertDialogAction>
           </AlertDialogFooter>
@@ -403,7 +448,7 @@ export default function GameClient() {
               <div className="flex items-center gap-2"><Users /> Player 2: <span className="text-destructive">{player2TotalScore}</span></div>
            </div>
           
-           <Button onClick={startNewGame} size="lg" className="mt-8">Play Again</Button>
+           <Button onClick={handleNewGameClick} size="lg" className="mt-8">Play Again</Button>
          </Card>
        )}
 
@@ -450,15 +495,21 @@ export default function GameClient() {
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               {currentPlayer === 'Player 1' ? <User /> : <Users />}
-              {currentPlayer}'s Turn
+              {currentPlayer}'s Turn ({gameMode} mode)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 pt-3">
             <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length < 3}>
+            <div className={cn("grid grid-cols-3 gap-2 mt-3", gameMode === 'pro' && 'grid-cols-5')}>
+              {gameMode === 'pro' && (
+                <>
+                  <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
+                  <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
+                </>
+              )}
+              <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length === 0}>
                 <Send className="mr-2 h-4 w-4"/> Submit
               </Button>
               <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
