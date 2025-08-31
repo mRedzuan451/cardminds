@@ -22,6 +22,8 @@ import {
 
 type GameState = 'initial' | 'playing' | 'ended';
 
+const MAX_DRAWS = 3;
+
 export default function GameClient() {
   const [gameState, setGameState] = useState<GameState>('initial');
   const [deck, setDeck] = useState<CardType[]>([]);
@@ -33,6 +35,7 @@ export default function GameClient() {
   const [score, setScore] = useState<number>(0);
   const [finalResult, setFinalResult] = useState<number>(0);
   const [showHint, setShowHint] = useState(false);
+  const [drawsRemaining, setDrawsRemaining] = useState(MAX_DRAWS);
   
   const { toast } = useToast();
 
@@ -49,6 +52,7 @@ export default function GameClient() {
     setScore(0);
     setGameState('playing');
     setShowHint(false);
+    setDrawsRemaining(MAX_DRAWS);
   }, []);
 
   useEffect(() => {
@@ -97,6 +101,10 @@ export default function GameClient() {
   };
   
   const handlePassAndDraw = () => {
+    if (drawsRemaining <= 0) {
+      toast({ title: "No draws left!", description: "You cannot draw any more cards this round.", variant: "destructive" });
+      return;
+    }
     if (deck.length === 0) {
       toast({ title: "No cards left!", description: "The deck is empty." });
       return;
@@ -108,6 +116,7 @@ export default function GameClient() {
     const [newCard, ...restOfDeck] = deck;
     setHand([...hand, newCard]);
     setDeck(restOfDeck);
+    setDrawsRemaining(drawsRemaining - 1);
     toast({ title: "Passed Turn", description: "You drew a new card." });
   };
   
@@ -190,8 +199,8 @@ export default function GameClient() {
               <Button onClick={handleSubmitEquation} className="flex-grow">
                 <Send className="mr-2 h-4 w-4"/> Submit
               </Button>
-              <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow">
-                <SkipForward className="mr-2 h-4 w-4"/> Draw <Badge variant="outline" className="ml-2">{deck.length}</Badge>
+              <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={drawsRemaining <= 0}>
+                <SkipForward className="mr-2 h-4 w-4"/> Draw <Badge variant="outline" className="ml-2">{drawsRemaining} left</Badge>
               </Button>
               <Button onClick={handleClearEquation} variant="destructive" size="icon" disabled={equation.length === 0} className="col-span-2 md:col-auto md:w-auto">
                 <X className="h-4 w-4"/>
