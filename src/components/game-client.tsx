@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, SkipForward, X, Lightbulb } from 'lucide-react';
+import { RefreshCw, Send, SkipForward, X, Lightbulb, Bot, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -19,23 +19,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { findBestEquation } from '@/ai/flows/bot-flow';
+import { Skeleton } from './ui/skeleton';
 
-type GameState = 'initial' | 'playing' | 'ended';
+type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'ended';
+type Player = 'human' | 'bot';
 
 const MAX_DRAWS = 3;
 
 export default function GameClient() {
   const [gameState, setGameState] = useState<GameState>('initial');
   const [deck, setDeck] = useState<CardType[]>([]);
-  const [hand, setHand] = useState<Hand>([]);
+  const [humanHand, setHumanHand] = useState<Hand>([]);
+  const [botHand, setBotHand] = useState<Hand>([]);
   const [targetNumber, setTargetNumber] = useState<number>(0);
   const [targetCards, setTargetCards] = useState<CardType[]>([]);
   const [equation, setEquation] = useState<EquationTerm[]>([]);
   const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
-  const [score, setScore] = useState<number>(0);
-  const [finalResult, setFinalResult] = useState<number>(0);
+  
+  const [humanScore, setHumanScore] = useState<number>(0);
+  const [humanFinalResult, setHumanFinalResult] = useState<number>(0);
+  const [botScore, setBotScore] = useState<number>(0);
+  const [botFinalResult, setBotFinalResult] = useState<number>(0);
+  const [botEquation, setBotEquation] = useState<EquationTerm[]>([]);
+  
   const [showHint, setShowHint] = useState(false);
   const [drawsRemaining, setDrawsRemaining] = useState(MAX_DRAWS);
+  const [winner, setWinner] = useState<Player | 'draw' | null>(null);
+  const [isBotThinking, setIsBotThinking] = useState(false);
   
   const { toast } = useToast();
 
@@ -45,12 +56,18 @@ export default function GameClient() {
     
     setTargetNumber(target);
     setTargetCards(cardsUsed);
-    setHand(newDeck.slice(0, 5));
-    setDeck(newDeck.slice(5));
+
+    setHumanHand(newDeck.slice(0, 5));
+    setBotHand(newDeck.slice(5, 10));
+    setDeck(newDeck.slice(10));
+    
     setEquation([]);
     setUsedCardIndices(new Set());
-    setScore(0);
-    setGameState('playing');
+    setHumanScore(0);
+    setBotScore(0);
+    setBotEquation([]);
+    setWinner(null);
+    setGameState('playerTurn');
     setShowHint(false);
     setDrawsRemaining(MAX_DRAWS);
   }, []);
@@ -60,7 +77,7 @@ export default function GameClient() {
   }, [startGame]);
 
   const handleCardClick = (card: CardType, index: number) => {
-    if (gameState !== 'playing' || usedCardIndices.has(index)) return;
+    if (gameState !== 'playerTurn' || usedCardIndices.has(index)) return;
 
     const value = CARD_VALUES[card.rank];
     const lastTerm = equation.length > 0 ? equation[equation.length - 1] : null;
@@ -79,10 +96,25 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
+  const endPlayerTurn = (result: number, cardsUsedCount: number) => {
+    const newScore = calculateScore(result, targetNumber, cardsUsedCount);
+    setHumanScore(newScore);
+    setHumanFinalResult(result);
+    setGameState('botTurn');
+  };
+
   const handleSubmitEquation = () => {
-    if (equation.length < 3) {
-        toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
-        return;
+    if (gameState !== 'playerTurn') return;
+    if (equation.length > 0 && equation.length < 3) {
+      toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
+      return;
+    }
+
+    // If player submits empty equation, it's a pass with score 0
+    if (equation.length === 0) {
+      endPlayerTurn(0, 0);
+      toast({ title: "You Passed", description: "Your turn has ended. Bot is now playing." });
+      return;
     }
 
     const result = evaluateEquation(equation);
@@ -93,14 +125,12 @@ export default function GameClient() {
     }
     
     if (typeof result === 'number') {
-        const newScore = calculateScore(result, targetNumber, usedCardIndices.size);
-        setScore(newScore);
-        setFinalResult(result);
-        setGameState('ended');
+      endPlayerTurn(result, usedCardIndices.size);
     }
   };
   
   const handlePassAndDraw = () => {
+    if (gameState !== 'playerTurn') return;
     if (drawsRemaining <= 0) {
       toast({ title: "No draws left!", description: "You cannot draw any more cards this round.", variant: "destructive" });
       return;
@@ -109,25 +139,103 @@ export default function GameClient() {
       toast({ title: "No cards left!", description: "The deck is empty." });
       return;
     }
-    if (hand.length >= 10) {
+    if (humanHand.length >= 10) {
       toast({ title: "Hand is full!", description: "You can't have more than 10 cards." });
       return;
     }
     const [newCard, ...restOfDeck] = deck;
-    setHand([...hand, newCard]);
+    setHumanHand([...humanHand, newCard]);
     setDeck(restOfDeck);
     setDrawsRemaining(drawsRemaining - 1);
-    toast({ title: "Passed Turn", description: "You drew a new card." });
+    toast({ title: "Passed Turn", description: "You drew a new card. You can continue building your equation or submit." });
   };
+
+  const determineWinner = useCallback(() => {
+    if (humanScore > botScore) {
+      setWinner('human');
+    } else if (botScore > humanScore) {
+      setWinner('bot');
+    } else {
+      setWinner('draw');
+    }
+    setGameState('ended');
+  }, [humanScore, botScore]);
   
+  const executeBotTurn = useCallback(async () => {
+    setIsBotThinking(true);
+    try {
+      const botResult = await findBestEquation({ hand: botHand, target: targetNumber });
+      
+      if (botResult.shouldPass || botResult.equation.length === 0) {
+        toast({
+          title: "Bot Passed",
+          description: botResult.reasoning,
+        });
+        setBotScore(0);
+        setBotFinalResult(0);
+        setBotEquation([]);
+      } else {
+        const botEq = botResult.equation;
+        const evaluation = evaluateEquation(botEq as EquationTerm[]);
+        if (typeof evaluation === 'number') {
+          const score = calculateScore(evaluation, targetNumber, botEq.length);
+          setBotScore(score);
+          setBotFinalResult(evaluation);
+          setBotEquation(botEq as EquationTerm[]);
+          toast({
+            title: "Bot Played an Equation!",
+            description: botResult.reasoning,
+          });
+        } else {
+          // Bot failed to create a valid equation, treat as a pass
+          setBotScore(0);
+          setBotFinalResult(0);
+          setBotEquation([]);
+          toast({
+            title: "Bot failed",
+            description: "The bot tried to make a move but failed.",
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Bot AI error:", error);
+      setBotScore(0); // Penalize bot for error
+      toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
+    } finally {
+      setIsBotThinking(false);
+      determineWinner();
+    }
+  }, [botHand, targetNumber, determineWinner]);
+
+  useEffect(() => {
+    if (gameState === 'botTurn') {
+      const timer = setTimeout(() => executeBotTurn(), 1500); // Give a slight delay for realism
+      return () => clearTimeout(timer);
+    }
+  }, [gameState, executeBotTurn]);
+
   const equationString = useMemo(() => equation.map((term, i) => (
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
   )), [equation]);
   
+  const botEquationString = useMemo(() => botEquation.map((term, i) => (
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
+  )), [botEquation]);
+
   const targetEquation = useMemo(() => {
     if (!targetCards || targetCards.length === 0) return null;
     return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
   }, [targetCards]);
+
+  const renderWinner = () => {
+    if (!winner) return null;
+    switch (winner) {
+      case 'human': return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">You Win!</p>;
+      case 'bot': return <p className="text-4xl md:text-5xl font-bold my-6 text-destructive">Bot Wins!</p>;
+      case 'draw': return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
+    }
+  };
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
@@ -174,35 +282,53 @@ export default function GameClient() {
 
       {gameState === 'ended' && (
         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
-          <CardTitle className="text-4xl font-headline mb-4">Game Over!</CardTitle>
-          <div className="text-xl md:text-2xl flex items-center justify-center gap-2 flex-wrap">
-            Your equation:
-            {equationString}
-            <span className="mx-2">=</span>
-            <span className="font-bold text-accent">{finalResult}</span>
+          <CardTitle className="text-4xl font-headline mb-4">Round Over!</CardTitle>
+          {renderWinner()}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
+            <div className='space-y-2'>
+              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> Your Score: <span className="text-primary">{humanScore}</span></h3>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                Your equation:
+                {equationString}
+                <span className="mx-2">=</span>
+                <span className="font-bold text-accent">{humanFinalResult}</span>
+              </div>
+            </div>
+            <div className='space-y-2'>
+              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Bot /> Bot Score: <span className="text-destructive">{botScore}</span></h3>
+              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[36px]">
+                {botEquation.length > 0 ? (
+                  <>
+                  Bot's equation:
+                  {botEquationString}
+                  <span className="mx-2">=</span>
+                  <span className="font-bold text-accent">{botFinalResult}</span>
+                  </>
+                ) : <p>Bot passed.</p>}
+              </div>
+            </div>
           </div>
-          <p className="text-4xl md:text-5xl font-bold my-6">Your Score: <span className="text-primary">{score}</span></p>
-          <Button onClick={startGame} size="lg">Play Again</Button>
+          <Button onClick={startGame} size="lg" className="mt-8">Play Again</Button>
         </Card>
       )}
       
-      {gameState === 'playing' && (
+      {gameState === 'playerTurn' && (
         <Card className="shadow-lg sticky top-[85px] z-10 bg-card/90 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="font-headline">Your Equation</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><User /> Your Turn</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 bg-muted p-4 rounded-lg min-h-[72px] text-2xl font-bold flex-wrap">
-              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build...</span>}
+              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build an equation, or submit with no cards to pass.</span>}
             </div>
-            <div className="grid grid-cols-2 md:flex gap-2 mt-4">
-              <Button onClick={handleSubmitEquation} className="flex-grow">
-                <Send className="mr-2 h-4 w-4"/> Submit
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+              <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1">
+                <Send className="mr-2 h-4 w-4"/> Submit Turn
               </Button>
               <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={drawsRemaining <= 0}>
-                <SkipForward className="mr-2 h-4 w-4"/> Draw <Badge variant="outline" className="ml-2">{drawsRemaining} left</Badge>
+                <SkipForward className="mr-2 h-4 w-4"/> Draw Card <Badge variant="outline" className="ml-2">{drawsRemaining} left</Badge>
               </Button>
-              <Button onClick={handleClearEquation} variant="destructive" size="icon" disabled={equation.length === 0} className="col-span-2 md:col-auto md:w-auto">
+              <Button onClick={handleClearEquation} variant="destructive" size="icon" disabled={equation.length === 0}>
                 <X className="h-4 w-4"/>
                 <span className="sr-only">Clear equation</span>
               </Button>
@@ -211,24 +337,48 @@ export default function GameClient() {
         </Card>
       )}
 
+      {isBotThinking && (
+        <Card className="shadow-lg p-6 flex flex-col items-center justify-center gap-4">
+            <Bot className="h-10 w-10 animate-bounce text-primary" />
+            <p className="text-xl font-headline">Bot is thinking...</p>
+            <Skeleton className="h-4 w-48" />
+        </Card>
+      )}
+
+
       {gameState !== 'initial' && (
-        <div>
-          <h2 className="text-2xl font-bold font-headline mb-4 mt-8">Your Hand</h2>
-          <div className="flex flex-wrap justify-center gap-2 md:gap-4">
-            {hand.map((card, index) => (
-              <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
-                <GameCard
-                  card={card}
-                  onClick={() => handleCardClick(card, index)}
-                  className={cn(
-                    'transition-all duration-200',
-                    usedCardIndices.has(index) && "opacity-30 scale-90 -translate-y-4 cursor-not-allowed",
-                    gameState !== 'playing' && "cursor-not-allowed"
-                  )}
-                />
+        <div className="space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold font-headline mb-4 mt-8 flex items-center gap-2"><Bot /> Bot's Hand</h2>
+              <div className="flex flex-wrap justify-center gap-2 md:gap-4">
+                {botHand.map((card, index) => (
+                  <div key={`bot-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
+                    <GameCard
+                      card={card}
+                      isFaceDown={gameState !== 'ended'}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold font-headline mb-4 mt-8 flex items-center gap-2"><User /> Your Hand</h2>
+              <div className="flex flex-wrap justify-center gap-2 md:gap-4">
+                {humanHand.map((card, index) => (
+                  <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
+                    <GameCard
+                      card={card}
+                      onClick={() => handleCardClick(card, index)}
+                      className={cn(
+                        'transition-all duration-200',
+                        usedCardIndices.has(index) && "opacity-30 scale-90 -translate-y-4 cursor-not-allowed",
+                        gameState !== 'playerTurn' && "cursor-not-allowed"
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
         </div>
       )}
     </div>
