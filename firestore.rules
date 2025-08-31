@@ -1,21 +1,30 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     match /games/{gameId} {
-      // Allow anyone to create a game.
+      // Allow anyone to create a new game document.
+      // In a real app with authentication, you would restrict this to logged-in users.
+      // e.g. allow create: if request.auth != null;
       allow create: if true;
 
-      // Allow anyone to read or update a game.
-      // TODO: This should be restricted to players in the game once auth is added.
-      // e.g., allow read, update: if request.auth.uid in resource.data.players;
-      allow read, update, delete: if true;
-
+      // Allow players to read and update game documents.
+      // This is a simplified check because we don't have user authentication yet.
+      // It allows any client to read and write if they know the game ID.
+      // Once auth is implemented, you would add:
+      // && request.auth.uid in resource.data.players
+      allow read, update: if true;
+      
       match /players/{playerId} {
-        // Allow anyone to interact with players in a game.
-        // TODO: This should be restricted.
-        // e.g., allow read, create, update: if request.auth.uid == playerId || get(/databases/$(database)/documents/games/$(gameId)).data.creatorId == request.auth.uid;
-        allow read, create, update: if true;
+          // Allow anyone to create a player, which happens when they join a game.
+          // With authentication, you'd add:
+          // && request.auth.uid == playerId
+          allow create: if true;
+
+          // Allow players to update their own data.
+          // With authentication, you'd add:
+          // && request.auth.uid == playerId
+          allow read, update: if true;
       }
     }
   }
