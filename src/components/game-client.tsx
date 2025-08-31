@@ -128,18 +128,7 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
-  const determineRoundWinner = useCallback(() => {
-    let p1Score = player1RoundScore;
-    let p2Score = player2RoundScore;
-    
-    // This is needed because the state update from the last turn might not be processed yet
-    if (currentPlayer === 'Player 2') {
-        const lastEquation = player2Equation;
-        const lastResult = player2FinalResult;
-        const lastPassed = player2Passed;
-        p2Score = lastPassed ? 0 : calculateScore(lastResult, targetNumber, lastEquation.length);
-    }
-
+  const determineRoundWinner = (p1Score: number, p2Score: number) => {
     let winner: Player | 'draw' | null = null;
     if (p1Score > p2Score) {
       winner = 'Player 1';
@@ -150,15 +139,20 @@ export default function GameClient() {
     }
     setRoundWinner(winner);
 
-    setPlayer1TotalScore(prev => prev + p1Score);
-    setPlayer2TotalScore(prev => prev + p2Score);
+    const nextP1Total = player1TotalScore + p1Score;
+    const nextP2Total = player2TotalScore + p2Score;
+    setPlayer1TotalScore(nextP1Total);
+    setPlayer2TotalScore(nextP2Total);
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
+      if (nextP1Total > nextP2Total) {
+        setShowConfetti(true);
+      }
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore, player2Equation, player2FinalResult, player2Passed, targetNumber, currentPlayer]);
+  };
 
   const switchTurn = () => {
     setEquation([]);
@@ -179,12 +173,13 @@ export default function GameClient() {
       setPlayer1Passed(passed);
       switchTurn();
     } else { // Player 2
-      setPlayer2RoundScore(newScore);
+      const p2Score = newScore;
+      setPlayer2RoundScore(p2Score);
       setPlayer2FinalResult(result);
       setPlayer2Equation(equation);
       setPlayer2Passed(passed);
       // Now that both players have played, determine the winner.
-      determineRoundWinner();
+      determineRoundWinner(player1RoundScore, p2Score);
     }
   };
 
@@ -235,12 +230,10 @@ export default function GameClient() {
   };
 
   useEffect(() => {
-    if (gameState === 'gameOver' && player1TotalScore !== 0 && player2TotalScore !== 0) {
-      if (player1TotalScore > player2TotalScore) {
+    if (gameState === 'gameOver' && totalWinner === 'Player 1' && !showConfetti) {
         setShowConfetti(true);
-      }
     }
-  }, [gameState, player1TotalScore, player2TotalScore]);
+  }, [gameState, showConfetti]);
 
   useEffect(() => {
     if (gameState === 'roundOver' || gameState === 'gameOver') {
