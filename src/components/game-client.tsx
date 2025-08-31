@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, Bot, User, LogOut, FilePlus } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, Bot, User, LogOut, FilePlus, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { BotOutput, findBestEquation } from '@/ai/flows/bot-flow';
 import { Skeleton } from './ui/skeleton';
+import Confetti from 'react-confetti';
 
-type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'ended';
+type GameState = 'initial' | 'playerTurn' | 'botTurn' | 'roundOver' | 'gameOver';
 type Player = 'human' | 'bot';
 const MAX_DRAWS = 3;
+const TOTAL_ROUNDS = 3;
 
 export default function GameClient() {
   const [gameState, setGameState] = useState<GameState>('initial');
@@ -36,9 +38,9 @@ export default function GameClient() {
   const [equation, setEquation] = useState<EquationTerm[]>([]);
   const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
   
-  const [humanScore, setHumanScore] = useState<number>(0);
+  const [humanRoundScore, setHumanRoundScore] = useState<number>(0);
   const [humanFinalResult, setHumanFinalResult] = useState<number>(0);
-  const [botScore, setBotScore] = useState<number>(0);
+  const [botRoundScore, setBotRoundScore] = useState<number>(0);
   const [botFinalResult, setBotFinalResult] = useState<number>(0);
   const [botEquation, setBotEquation] = useState<EquationTerm[]>([]);
   const [botReasoning, setBotReasoning] = useState<string>("");
@@ -47,12 +49,25 @@ export default function GameClient() {
   const [humanDrawsLeft, setHumanDrawsLeft] = useState(MAX_DRAWS);
   const [botDrawsLeft, setBotDrawsLeft] = useState(MAX_DRAWS);
   
-  const [winner, setWinner] = useState<Player | 'draw' | null>(null);
+  const [roundWinner, setRoundWinner] = useState<Player | 'draw' | null>(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
-  
+
+  const [currentRound, setCurrentRound] = useState(1);
+  const [humanTotalScore, setHumanTotalScore] = useState(0);
+  const [botTotalScore, setBotTotalScore] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+
   const { toast } = useToast();
 
-  const startGame = useCallback(() => {
+  const startNewGame = useCallback(() => {
+    setCurrentRound(1);
+    setHumanTotalScore(0);
+    setBotTotalScore(0);
+    setShowConfetti(false);
+    startNewRound();
+  }, []);
+  
+  const startNewRound = useCallback(() => {
     const newDeck = shuffleDeck(createDeck());
     const { target, cardsUsed } = generateTarget();
     
@@ -65,13 +80,13 @@ export default function GameClient() {
     
     setEquation([]);
     setUsedCardIndices(new Set());
-    setHumanScore(0);
+    setHumanRoundScore(0);
     setHumanFinalResult(0);
-    setBotScore(0);
+    setBotRoundScore(0);
     setBotFinalResult(0);
     setBotEquation([]);
     setBotReasoning("");
-    setWinner(null);
+    setRoundWinner(null);
     setGameState('playerTurn');
     setShowHint(false);
     setIsBotThinking(false);
@@ -79,9 +94,10 @@ export default function GameClient() {
     setBotDrawsLeft(MAX_DRAWS);
   }, []);
 
+
   useEffect(() => {
-    startGame();
-  }, [startGame]);
+    startNewGame();
+  }, [startNewGame]);
 
   const handleCardClick = (card: CardType, index: number) => {
     if (gameState !== 'playerTurn' || usedCardIndices.has(index)) return;
@@ -105,7 +121,7 @@ export default function GameClient() {
   
   const endPlayerTurn = (result: number, cardsUsedCount: number) => {
     const newScore = calculateScore(result, targetNumber, cardsUsedCount);
-    setHumanScore(newScore);
+    setHumanRoundScore(newScore);
     setHumanFinalResult(result);
     setGameState('botTurn');
   };
@@ -150,26 +166,35 @@ export default function GameClient() {
     }
   };
 
-  const determineWinner = useCallback((currentHumanScore: number, currentBotScore: number) => {
+  const determineRoundWinner = useCallback((currentHumanScore: number, currentBotScore: number) => {
+    setHumanTotalScore(prev => prev + currentHumanScore);
+    setBotTotalScore(prev => prev + currentBotScore);
+
     if (currentHumanScore > currentBotScore) {
-      setWinner('human');
+      setRoundWinner('human');
     } else if (currentBotScore > currentHumanScore) {
-      setWinner('bot');
+      setRoundWinner('bot');
     } else {
-      setWinner('draw');
+      setRoundWinner('draw');
     }
-    setGameState('ended');
-  }, []);
+
+    if (currentRound >= TOTAL_ROUNDS) {
+      setGameState('gameOver');
+      setShowConfetti(true);
+    } else {
+      setGameState('roundOver');
+    }
+  }, [currentRound]);
   
   const executeBotTurn = useCallback(async (isMounted: () => boolean) => {
-    if (!isMounted()) return;
+    if (!isMounted() || gameState !== 'botTurn') return;
 
     setIsBotThinking(true);
     let botResponse: BotOutput | null = null;
     try {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
-      if (!isMounted()) return;
+      if (!isMounted() || gameState !== 'botTurn') return;
       
       setBotReasoning(botResponse.reasoning);
 
@@ -186,10 +211,10 @@ export default function GameClient() {
         } else {
             console.error("Bot evaluation error:", evaluation.error);
         }
-        setBotScore(currentBotScore);
+        setBotRoundScore(currentBotScore);
         setBotFinalResult(currentBotResult);
         setBotEquation(botEq);
-        determineWinner(humanScore, currentBotScore);
+        determineRoundWinner(humanRoundScore, currentBotScore);
       } else if (botResponse.action === 'draw') {
         if (deck.length > 0 && botDrawsLeft > 0) {
           const [newCard, ...restOfDeck] = deck;
@@ -199,40 +224,45 @@ export default function GameClient() {
           
           setTimeout(() => executeBotTurn(isMounted), 2000); 
         } else {
-          setBotScore(0);
-          determineWinner(humanScore, 0);
+          setBotRoundScore(0);
+          determineRoundWinner(humanRoundScore, 0);
         }
       } else { // 'pass'
-        setBotScore(0);
+        setBotRoundScore(0);
         setBotFinalResult(0);
         setBotEquation([]);
-        determineWinner(humanScore, 0);
+        determineRoundWinner(humanRoundScore, 0);
       }
 
     } catch (error) {
       console.error("Bot AI error:", error);
-      if (isMounted()) {
+      if (isMounted() && gameState === 'botTurn') {
         toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
-        setBotScore(0);
-        determineWinner(humanScore, 0);
+        setBotRoundScore(0);
+        determineRoundWinner(humanRoundScore, 0);
       }
     } finally {
         if (isMounted() && (!botResponse || botResponse.action !== 'draw')) {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, botDrawsLeft, determineWinner, toast, humanScore, deck]);
+  }, [botHand, targetNumber, botDrawsLeft, determineRoundWinner, toast, humanRoundScore, deck, gameState]);
 
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = () => true;
     if (gameState === 'botTurn') {
       const timer = setTimeout(() => executeBotTurn(() => isMounted), 1500);
       return () => {
-        isMounted = false;
+        isMounted = () => false;
         clearTimeout(timer);
       };
     }
   }, [gameState, executeBotTurn]);
+
+  const handleNextRound = () => {
+    setCurrentRound(prev => prev + 1);
+    startNewRound();
+  };
 
   const equationString = useMemo(() => equation.map((term, i) => (
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : 'default'} className="text-xl p-2">{term}</Badge>
@@ -247,17 +277,25 @@ export default function GameClient() {
     return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
   }, [targetCards]);
 
-  const renderWinner = () => {
-    if (!winner) return null;
-    switch (winner) {
-      case 'human': return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">You Win!</p>;
-      case 'bot': return <p className="text-4xl md:text-5xl font-bold my-6 text-destructive">Bot Wins!</p>;
+  const renderRoundWinner = () => {
+    if (!roundWinner) return null;
+    switch (roundWinner) {
+      case 'human': return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">You Win This Round!</p>;
+      case 'bot': return <p className="text-4xl md:text-5xl font-bold my-6 text-destructive">Bot Wins This Round!</p>;
       case 'draw': return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
     }
   };
 
+  const totalWinner = useMemo(() => {
+    if (gameState !== 'gameOver') return null;
+    if (humanTotalScore > botTotalScore) return 'human';
+    if (botTotalScore > humanTotalScore) return 'bot';
+    return 'draw';
+  }, [gameState, humanTotalScore, botTotalScore]);
+
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
+      {showConfetti && totalWinner && totalWinner !== 'draw' && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
         <Card className="text-center p-4 shadow-lg w-full md:w-auto">
           <CardHeader className="p-0 mb-1">
@@ -271,8 +309,22 @@ export default function GameClient() {
             </Button>
           </CardContent>
         </Card>
-        <div className="flex-grow" />
-        <Button onClick={startGame} size="lg" className="shadow-lg w-full md:w-auto">
+        
+        <Card className="text-center p-4 shadow-lg flex-grow">
+          <CardHeader className="p-0 mb-2">
+            <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {currentRound}/{TOTAL_ROUNDS})</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 flex justify-around items-center gap-4">
+              <div className="flex items-center gap-2 text-xl font-bold">
+                <User /> You: <span className="text-primary">{humanTotalScore}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xl font-bold">
+                <Bot /> Bot: <span className="text-destructive">{botTotalScore}</span>
+              </div>
+          </CardContent>
+        </Card>
+
+        <Button onClick={startNewGame} size="lg" className="shadow-lg w-full md:w-auto">
           <RefreshCw className="mr-2 h-5 w-5"/> New Game
         </Button>
       </div>
@@ -299,13 +351,30 @@ export default function GameClient() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {(gameState === 'ended' && !isBotThinking) && (
+      {gameState === 'gameOver' && !isBotThinking && (
+         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
+           <CardTitle className="text-5xl font-headline mb-4 flex items-center justify-center gap-4"><Trophy className="w-12 h-12 text-yellow-400" />Game Over!</CardTitle>
+           {totalWinner === 'human' && <p className="text-4xl font-bold my-6 text-primary">You are the Grand Winner!</p>}
+           {totalWinner === 'bot' && <p className="text-4xl font-bold my-6 text-destructive">The Bot is the Grand Winner!</p>}
+           {totalWinner === 'draw' && <p className="text-4xl font-bold my-6 text-muted-foreground">It's a tie!</p>}
+           
+           <div className="text-2xl font-bold">Final Score</div>
+           <div className="flex justify-center items-center gap-8 text-xl my-4">
+              <div className="flex items-center gap-2"><User /> You: <span className="text-primary">{humanTotalScore}</span></div>
+              <div className="flex items-center gap-2"><Bot /> Bot: <span className="text-destructive">{botTotalScore}</span></div>
+           </div>
+          
+           <Button onClick={startNewGame} size="lg" className="mt-8">Play Again</Button>
+         </Card>
+       )}
+
+      {(gameState === 'roundOver' && !isBotThinking) && (
         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
-          <CardTitle className="text-4xl font-headline mb-4">Round Over!</CardTitle>
-          {renderWinner()}
+          <CardTitle className="text-4xl font-headline mb-4">Round {currentRound} Over!</CardTitle>
+          {renderRoundWinner()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
             <div className='space-y-2'>
-              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> Your Score: <span className="text-primary">{humanScore}</span></h3>
+              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> Your Score: <span className="text-primary">{humanRoundScore}</span></h3>
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 Your equation:
                 {equation.length > 0 ? (
@@ -318,7 +387,7 @@ export default function GameClient() {
               </div>
             </div>
             <div className='space-y-2'>
-              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Bot /> Bot Score: <span className="text-destructive">{botScore}</span></h3>
+              <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><Bot /> Bot Score: <span className="text-destructive">{botRoundScore}</span></h3>
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                 Bot's equation:
                 {botEquation.length > 0 ? (
@@ -334,12 +403,12 @@ export default function GameClient() {
               )}
             </div>
           </div>
-          <Button onClick={startGame} size="lg" className="mt-8">Play Again</Button>
+          <Button onClick={handleNextRound} size="lg" className="mt-8">Next Round</Button>
         </Card>
       )}
       
       {gameState === 'playerTurn' && (
-        <Card className="shadow-lg sticky top-[85px] z-10 bg-card/90 backdrop-blur-sm">
+        <Card className="shadow-lg sticky top-[100px] z-10 bg-card/90 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><User /> Your Turn</CardTitle>
           </CardHeader>
@@ -377,7 +446,7 @@ export default function GameClient() {
       )}
 
 
-      {gameState !== 'initial' && (
+      {gameState !== 'initial' && gameState !== 'gameOver' &&(
         <div className="space-y-8">
             <div>
               <h2 className="text-2xl font-bold font-headline mb-4 mt-8 flex items-center gap-2"><Bot /> Bot's Hand</h2>
@@ -386,7 +455,7 @@ export default function GameClient() {
                   <div key={`bot-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
                     <GameCard
                       card={card}
-                      isFaceDown={gameState !== 'ended'}
+                      isFaceDown={gameState !== 'roundOver' && gameState !== 'gameOver'}
                     />
                   </div>
                 ))}
