@@ -8,7 +8,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -291,6 +291,10 @@ export default function GameClient() {
   };
   
   const handleNewGameClick = () => {
+    startNewGame(gameMode);
+  }
+
+  const handleBackToMenu = () => {
     setGameState('modeSelection');
   }
 
@@ -367,9 +371,14 @@ export default function GameClient() {
         </Card>
         
         <div className="w-full md:w-auto flex-grow flex flex-col items-center justify-center gap-4">
-            <Button onClick={handleNewGameClick} size="lg" className="shadow-lg w-full max-w-xs">
-              <RefreshCw className="mr-2 h-5 w-5"/> New Game
-            </Button>
+            <div className="flex gap-2 w-full max-w-xs">
+              <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
+                <RefreshCw className="mr-2 h-5 w-5"/> New Game
+              </Button>
+              <Button onClick={handleBackToMenu} size="lg" className="shadow-lg" variant="outline">
+                <ArrowLeft className="mr-2 h-5 w-5"/> Menu
+              </Button>
+            </div>
             <Card className="text-center p-4 shadow-lg w-full max-w-xs">
             <CardHeader className="p-0 mb-1">
                 <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
@@ -448,7 +457,7 @@ export default function GameClient() {
               <div className="flex items-center gap-2"><Users /> Player 2: <span className="text-destructive">{player2TotalScore}</span></div>
            </div>
           
-           <Button onClick={handleNewGameClick} size="lg" className="mt-8">Play Again</Button>
+           <Button onClick={() => setGameState('modeSelection')} size="lg" className="mt-8">Play Again</Button>
          </Card>
        )}
 
@@ -551,5 +560,3 @@ export default function GameClient() {
     </div>
   );
 }
-
-    
