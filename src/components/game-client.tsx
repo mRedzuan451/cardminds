@@ -160,10 +160,8 @@ export default function GameClient() {
   }, [deck, player1Hand, player2Hand, toast]);
 
 
-  const determineRoundWinner = useCallback(() => {
+  const determineRoundWinner = useCallback((p1s: number, p2s: number) => {
     let winner: Player | 'draw' | null = null;
-    const p1s = player1RoundScore;
-    const p2s = player2RoundScore;
 
     if (p1s > p2s) {
       winner = 'Player 1';
@@ -188,7 +186,7 @@ export default function GameClient() {
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore, player1TotalScore, player2TotalScore]);
+  }, [currentRound, player1TotalScore, player2TotalScore]);
 
   const switchTurn = () => {
     setEquation([]);
@@ -208,7 +206,7 @@ export default function GameClient() {
     setShowTurnInterstitial(true);
   };
 
-  const endPlayerTurn = useCallback((result: number, cardsUsedCount: number, passed: boolean) => {
+  const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
     const newScore = passed ? 0 : calculateScore(result, targetNumber, cardsUsedCount);
 
     if (currentPlayer === 'Player 1') {
@@ -226,10 +224,10 @@ export default function GameClient() {
       if (passed && player1Passed) {
         handleBothPlayersPass();
       } else {
-        determineRoundWinner();
+        determineRoundWinner(player1RoundScore, newScore);
       }
     }
-  }, [currentPlayer, equation, targetNumber, determineRoundWinner, deck, player2Hand, player1Passed, handleBothPlayersPass]);
+  };
 
 
   const handlePass = () => {
