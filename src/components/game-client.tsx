@@ -161,21 +161,15 @@ export default function GameClient() {
     setGameState('ended');
   }, []);
   
-  const executeBotTurn = useCallback(async () => {
-    if (gameState !== 'botTurn') {
-      if (isBotThinking) setIsBotThinking(false);
-      return;
-    }
+  const executeBotTurn = useCallback(async (isMounted: () => boolean) => {
+    if (!isMounted()) return;
 
     setIsBotThinking(true);
     let botResponse: BotOutput | null = null;
     try {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
-      if (gameState !== 'botTurn') {
-        setIsBotThinking(false);
-        return;
-      }
+      if (!isMounted()) return;
       
       setBotReasoning(botResponse.reasoning);
 
@@ -203,7 +197,7 @@ export default function GameClient() {
           setDeck(restOfDeck);
           setBotDrawsLeft(botDrawsLeft - 1);
           
-          setTimeout(() => executeBotTurn(), 2000); 
+          setTimeout(() => executeBotTurn(isMounted), 2000); 
         } else {
           setBotScore(0);
           determineWinner(humanScore, 0);
@@ -217,22 +211,26 @@ export default function GameClient() {
 
     } catch (error) {
       console.error("Bot AI error:", error);
-      if (gameState === 'botTurn') {
+      if (isMounted()) {
         toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
         setBotScore(0);
         determineWinner(humanScore, 0);
       }
     } finally {
-        if (!botResponse || botResponse.action !== 'draw') {
+        if (isMounted() && (!botResponse || botResponse.action !== 'draw')) {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, botDrawsLeft, determineWinner, gameState, toast, humanScore, deck, isBotThinking]);
+  }, [botHand, targetNumber, botDrawsLeft, determineWinner, toast, humanScore, deck]);
 
   useEffect(() => {
+    let isMounted = true;
     if (gameState === 'botTurn') {
-      const timer = setTimeout(() => executeBotTurn(), 1500); 
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => executeBotTurn(() => isMounted), 1500);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
     }
   }, [gameState, executeBotTurn]);
 
