@@ -6,7 +6,7 @@ export const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10',
 
 export const CARD_VALUES: Record<Rank, EquationTerm> = {
   'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-  'J': '+', 'Q': '-', 'K': '*',
+  'J': '+', 'Q': '-', 'K': '/',
 };
 
 export function createDeck(): Card[] {
@@ -39,7 +39,7 @@ function generateEasyTarget(deck: Card[]): { target: number; cardsUsed: Card[], 
         const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
         let numCard1 = currentDeck.splice(numIndex1, 1)[0];
         
-        const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string');
+        const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/');
         const opCard = currentDeck.splice(opIndex, 1)[0];
 
         const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
@@ -135,5 +135,3 @@ export function calculateScore(result: number, target: number, cardsUsed: number
   const score = Math.max(0, 500 - (difference * 10) - (cardsUsed * 20));
   return Math.round(score);
 }
-
-    

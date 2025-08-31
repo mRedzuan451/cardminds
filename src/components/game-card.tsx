@@ -37,7 +37,7 @@ export function GameCard({ card, isFaceDown = false, className, ...props }: Game
         <Icon className="h-4 w-4 md:h-5 md:w-5" />
       </div>
       <div className="self-center text-3xl md:text-4xl font-bold">
-        {value}
+        {value === '/' ? '÷' : value}
       </div>
       <div className="flex flex-col items-end rotate-180">
         <div className="text-xl md:text-2xl font-bold">{rank}</div>

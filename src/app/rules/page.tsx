@@ -37,24 +37,39 @@ export default function RulesPage() {
               <li><span className="font-bold">2-10:</span> Face value</li>
               <li><span className="font-bold">Jack (J):</span> Addition (+)</li>
               <li><span className="font-bold">Queen (Q):</span> Subtraction (-)</li>
-              <li><span className="font-bold">King (K):</span> Multiplication (*)</li>
+              <li><span className="font-bold">King (K):</span> Division (/)</li>
               <li><span className="font-bold">Ace (A):</span> The number 1</li>
             </ul>
+            <p className="mt-4">
+              In <strong>Pro Mode</strong>, multiplication must be done using parentheses, for example: (5+2)7 would be invalid, but (5+2)*7 is how you would do it.
+            </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold mb-2 font-headline">Gameplay</h2>
             <ol className="list-decimal list-inside space-y-2">
               <li>The game starts with a random Target Number and 5 cards in your hand.</li>
-              <li>On your turn, you have two choices:</li>
+              <li>On your turn, you will automatically draw one new card.</li>
+              <li>You then have two choices:</li>
               <li className="ml-4 mt-2">
-                <strong>A) Play an Equation:</strong> Select cards from your hand to form a valid equation (e.g., 7 + 1). The equation must alternate between numbers and operators. Once you submit, your score is calculated and the round ends.
+                <strong>A) Play an Equation:</strong> Select cards from your hand to form a valid equation (e.g., 7 + 1). Once you submit, your score is calculated and the round ends.
               </li>
               <li className="ml-4 mt-2">
-                <strong>B) Pass & Draw:</strong> If you cannot or do not want to make an equation, you can pass your turn. You will draw one new card into your hand.
+                <strong>B) Pass:</strong> If you cannot or do not want to make an equation, you can pass your turn.
               </li>
-              <li>The game ends when you submit an equation. To start a new game, click the "New Game" button.</li>
+              <li>If both players pass consecutively, a new card is drawn for each player and the round continues.</li>
+              <li>The game is played over 3 rounds.</li>
             </ol>
+          </section>
+          
+          <section>
+            <h2 className="text-2xl font-bold mb-2 font-headline">Game Modes</h2>
+            <div className="space-y-2">
+              <h3 className="font-bold text-xl">Easy Mode</h3>
+              <p>A simpler mode where equations must alternate between numbers and operators.</p>
+              <h3 className="font-bold text-xl mt-2">Pro Mode</h3>
+              <p>A more complex mode where the target is generated from two concatenated cards (e.g. a 2 and 5 make a target of 25). Parentheses `()` can be used to group operations.</p>
+            </div>
           </section>
 
           <section>
@@ -63,7 +78,7 @@ export default function RulesPage() {
             <ul className="list-disc list-inside space-y-1">
               <li>The smaller the difference between your result and the target, the higher your score.</li>
               <li>Using fewer cards gives you a better score.</li>
-              <li>A perfect match on the target number gives a significant bonus!</li>
+              <li>A perfect match on the target number gives a significant bonus! (1000 points)</li>
             </ul>
           </section>
         </CardContent>
