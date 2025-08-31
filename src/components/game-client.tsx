@@ -7,7 +7,7 @@ import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, Hand, EquationTerm } from '@/lib/types';
 import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, CARD_VALUES } from '@/lib/game';
-import { RefreshCw, Send, SkipForward, X, Lightbulb, Bot, User } from 'lucide-react';
+import { RefreshCw, Send, SkipForward, X, Lightbulb, Bot, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -103,17 +103,17 @@ export default function GameClient() {
     setGameState('botTurn');
   };
 
-  const handleSubmitEquation = () => {
+  const handlePass = () => {
     if (gameState !== 'playerTurn') return;
+    endPlayerTurn(0, 0);
+    toast({ title: "You Passed", description: "Your turn has ended. Bot is now playing." });
+  };
+  
+  const handleSubmitEquation = () => {
+    if (gameState !== 'playerTurn' || equation.length === 0) return;
+
     if (equation.length > 0 && equation.length < 3) {
       toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
-      return;
-    }
-
-    // If player submits empty equation, it's a pass with score 0
-    if (equation.length === 0) {
-      endPlayerTurn(0, 0);
-      toast({ title: "You Passed", description: "Your turn has ended. Bot is now playing." });
       return;
     }
 
@@ -319,12 +319,18 @@ export default function GameClient() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 bg-muted p-4 rounded-lg min-h-[72px] text-2xl font-bold flex-wrap">
-              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build an equation, or submit with no cards to pass.</span>}
+              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-lg font-normal">Click cards below to build an equation, or pass your turn.</span>}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-              <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1">
-                <Send className="mr-2 h-4 w-4"/> Submit Turn
-              </Button>
+              {equation.length > 0 ? (
+                <Button onClick={handleSubmitEquation} className="flex-grow col-span-2 md:col-span-1">
+                  <Send className="mr-2 h-4 w-4"/> Submit Equation
+                </Button>
+              ) : (
+                <Button onClick={handlePass} className="flex-grow col-span-2 md:col-span-1" variant="secondary">
+                  <LogOut className="mr-2 h-4 w-4"/> Pass Turn
+                </Button>
+              )}
               <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={drawsRemaining <= 0}>
                 <SkipForward className="mr-2 h-4 w-4"/> Draw Card <Badge variant="outline" className="ml-2">{drawsRemaining} left</Badge>
               </Button>
@@ -384,3 +390,5 @@ export default function GameClient() {
     </div>
   );
 }
+
+    
