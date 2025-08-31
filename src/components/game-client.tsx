@@ -172,6 +172,7 @@ export default function GameClient() {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
       if (gameState !== 'botTurn') { // Check again in case state changed during API call
+        setIsBotThinking(false);
         return;
       }
       
@@ -198,7 +199,7 @@ export default function GameClient() {
           setBotDrawsLeft(botDrawsLeft - 1);
           
           // Bot gets to think again after drawing
-          setTimeout(() => executeBotTurn(), 1000); 
+          setTimeout(() => executeBotTurn(), 2000); 
         } else {
           // Can't draw, so just pass
           setBotScore(0);
@@ -411,5 +412,3 @@ export default function GameClient() {
     </div>
   );
 }
-
-    
