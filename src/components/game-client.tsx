@@ -129,25 +129,36 @@ export default function GameClient() {
   };
   
   const determineRoundWinner = useCallback(() => {
+    let p1Score = player1RoundScore;
+    let p2Score = player2RoundScore;
+    
+    // This is needed because the state update from the last turn might not be processed yet
+    if (currentPlayer === 'Player 2') {
+        const lastEquation = player2Equation;
+        const lastResult = player2FinalResult;
+        const lastPassed = player2Passed;
+        p2Score = lastPassed ? 0 : calculateScore(lastResult, targetNumber, lastEquation.length);
+    }
+
     let winner: Player | 'draw' | null = null;
-    if (player1RoundScore > player2RoundScore) {
+    if (p1Score > p2Score) {
       winner = 'Player 1';
-    } else if (player2RoundScore > player1RoundScore) {
+    } else if (p2Score > p1Score) {
       winner = 'Player 2';
     } else {
       winner = 'draw';
     }
     setRoundWinner(winner);
 
-    setPlayer1TotalScore(prev => prev + player1RoundScore);
-    setPlayer2TotalScore(prev => prev + player2RoundScore);
+    setPlayer1TotalScore(prev => prev + p1Score);
+    setPlayer2TotalScore(prev => prev + p2Score);
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore]);
+  }, [currentRound, player1RoundScore, player2RoundScore, player2Equation, player2FinalResult, player2Passed, targetNumber, currentPlayer]);
 
   const switchTurn = () => {
     setEquation([]);
@@ -159,7 +170,7 @@ export default function GameClient() {
   };
 
   const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
-    const newScore = calculateScore(result, targetNumber, cardsUsedCount);
+    const newScore = passed ? 0 : calculateScore(result, targetNumber, cardsUsedCount);
 
     if (currentPlayer === 'Player 1') {
       setPlayer1RoundScore(newScore);
@@ -299,7 +310,10 @@ export default function GameClient() {
           </CardContent>
         </Card>
         
-        <div className="w-full md:w-auto flex-grow flex justify-center">
+        <div className="w-full md:w-auto flex-grow flex flex-col items-center justify-center gap-4">
+            <Button onClick={startNewGame} size="lg" className="shadow-lg w-full max-w-xs">
+              <RefreshCw className="mr-2 h-5 w-5"/> New Game
+            </Button>
             <Card className="text-center p-4 shadow-lg w-full max-w-xs">
             <CardHeader className="p-0 mb-1">
                 <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
@@ -314,10 +328,9 @@ export default function GameClient() {
             </Card>
         </div>
 
+        <div className="w-full md:w-auto" />
 
-        <Button onClick={startNewGame} size="lg" className="shadow-lg w-full md:w-auto">
-          <RefreshCw className="mr-2 h-5 w-5"/> New Game
-        </Button>
+
       </div>
 
       <AlertDialog open={showHint} onOpenChange={setShowHint}>
