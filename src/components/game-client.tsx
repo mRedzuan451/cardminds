@@ -2,13 +2,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useDocument, useCollection } from 'react-firebase-hooks/firestore';
+import { doc, collection, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
-import type { Card as CardType, EquationTerm, GameMode, Player } from '@/lib/types';
-import { createDeck, shuffleDeck, generateTarget, evaluateEquation, calculateScore, getCardValues } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft } from 'lucide-react';
+import type { Card as CardType, EquationTerm, GameState, Game, Player } from '@/lib/types';
+import { evaluateEquation, getCardValues } from '@/lib/game';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -23,121 +25,80 @@ import {
 import Confetti from 'react-confetti';
 import { Label } from './ui/label';
 import { Slider } from './ui/slider';
+import { firebaseApp } from '@/lib/firebase';
+import * as gameActions from '@/ai/flows/game-actions';
+import { useRouter } from 'next/navigation';
 
-type GameState = 'initial' | 'playerSelection' | 'playerTurn' | 'roundOver' | 'gameOver';
+const db = getFirestore(firebaseApp);
 
-const TOTAL_ROUNDS = 3;
+export default function GameClient({ gameId, playerName }: { gameId: string, playerName: string }) {
+  const [gameDoc, loading, error] = useDocument(doc(db, 'games', gameId));
+  const [playersCollection] = useCollection(collection(db, 'games', gameId, 'players'));
 
-export default function GameClient() {
-  const [gameState, setGameState] = useState<GameState>('playerSelection');
-  const [gameMode, setGameMode] = useState<GameMode>('easy');
-  const [numberOfPlayers, setNumberOfPlayers] = useState(2);
-  const [players, setPlayers] = useState<Player[]>([]);
-
-  const [deck, setDeck] = useState<CardType[]>([]);
-  
-  const [targetNumber, setTargetNumber] = useState<number>(0);
-  const [targetCards, setTargetCards] = useState<CardType[]>([]);
+  const [localPlayerName, setLocalPlayerName] = useState(playerName);
   const [equation, setEquation] = useState<EquationTerm[]>([]);
   const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
-    
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
-  
   const [showHint, setShowHint] = useState(false);
-  
-  const [roundWinner, setRoundWinner] = useState<Player[] | null>(null);
-
-  const [currentRound, setCurrentRound] = useState(1);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showTurnInterstitial, setShowTurnInterstitial] = useState(false);
-
-  const { toast } = useToast();
   
-  const CARD_VALUES = useMemo(() => getCardValues(gameMode), [gameMode]);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const game = useMemo(() => gameDoc?.data() as Game | undefined, [gameDoc]);
+  const players = useMemo(() => playersCollection?.docs.map(d => ({...d.data(), id: d.id})) as Player[] | undefined, [playersCollection]);
+
+  const localPlayer = useMemo(() => players?.find(p => p.name === localPlayerName), [players, localPlayerName]);
+
+  const CARD_VALUES = useMemo(() => getCardValues(game?.gameMode ?? 'easy'), [game?.gameMode]);
+
+  useEffect(() => {
+    if (!loading && !gameDoc?.exists()) {
+      toast({ title: "Game not found", description: "The game ID you entered doesn't exist.", variant: "destructive" });
+      router.push('/');
+    }
+  }, [gameDoc, loading, router, toast]);
+
+  useEffect(() => {
+    const join = async () => {
+      if (game && players && !players.find(p => p.name === localPlayerName)) {
+        try {
+          await gameActions.joinGame({ gameId, playerName: localPlayerName });
+          toast({ title: `Joined game!`, description: `Welcome, ${localPlayerName}!`});
+        } catch (e: any) {
+          toast({ title: 'Error joining game', description: e.message, variant: 'destructive' });
+          router.push('/');
+        }
+      }
+    };
+    join();
+  }, [game, players, gameId, localPlayerName, router, toast]);
 
   const currentPlayer = useMemo(() => {
-    if (players.length > 0) {
-      return players[currentPlayerIndex];
-    }
-    return null;
-  }, [players, currentPlayerIndex]);
+    if (!game || !players || players.length === 0) return null;
+    return players.find(p => p.id === game.currentPlayerId);
+  }, [game, players]);
+  
+  const isMyTurn = useMemo(() => {
+    return currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
+  }, [currentPlayer, localPlayer, game]);
 
   const activeHand = useMemo(() => {
-    return currentPlayer?.hand ?? [];
-  }, [currentPlayer]);
-
-  const startNewGame = useCallback((mode: GameMode, numPlayers: number) => {
-    setGameState('initial');
-    setGameMode(mode);
-    setNumberOfPlayers(numPlayers);
-    setCurrentRound(1);
-    setShowConfetti(false);
-    
-    // Reset total scores for all players
-    const initialPlayers = Array.from({ length: numPlayers }, (_, i) => ({
-      id: i,
-      name: `Player ${i + 1}`,
-      hand: [],
-      roundScore: 0,
-      totalScore: 0, 
-      passed: false,
-      finalResult: 0,
-      equation: [],
-    }));
-    setPlayers(initialPlayers);
-
-    startNewRound(mode, numPlayers, initialPlayers);
-  }, []);
+    return localPlayer?.hand ?? [];
+  }, [localPlayer]);
   
-  const startNewRound = useCallback((mode: GameMode, numPlayers: number, currentPlayers: Player[]) => {
-    const deckCount = numPlayers > 4 ? 2 : 1;
-    let freshDeck = shuffleDeck(createDeck(deckCount));
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, mode);
-    
-    setTargetNumber(target);
-    setTargetCards(cardsUsed);
-    freshDeck = updatedDeck;
-    
-    const newPlayers = currentPlayers.map(p => {
-        const hand = freshDeck.splice(0, 5);
-        return {
-          ...p,
-          hand,
-          roundScore: 0,
-          passed: false,
-          finalResult: 0,
-          equation: [],
-        }
-    });
-
-    // Player 1 automatically draws a card
-    if (freshDeck.length > 0) {
-        newPlayers[0].hand.push(freshDeck.shift()!);
-    }
-
-    setPlayers(newPlayers);
-    setDeck(freshDeck);
-    
-    setEquation([]);
-    setUsedCardIndices(new Set());
-    setRoundWinner(null);
-    setShowHint(false);
-    setCurrentPlayerIndex(0);
-    setGameState('playerTurn');
-  }, []);
-
   const handleParenthesisClick = (paren: '(' | ')') => {
     setEquation([...equation, paren]);
   };
 
   const handleCardClick = (card: CardType, index: number) => {
-    if (gameState !== 'playerTurn') return;
+    if (!isMyTurn) return;
     if (usedCardIndices.has(index)) return;
 
     const value = CARD_VALUES[card.rank];
     const lastTerm = equation.length > 0 ? equation[equation.length - 1] : null;
 
-    if (gameMode === 'easy') {
+    if (game?.gameMode === 'easy') {
       if ( (typeof value === 'number' && typeof lastTerm === 'number') || (typeof value === 'string' && typeof lastTerm === 'string')) {
           toast({ title: "Invalid Move", description: "You must alternate between numbers and operators.", variant: "destructive" });
           return;
@@ -152,97 +113,22 @@ export default function GameClient() {
     setEquation([]);
     setUsedCardIndices(new Set());
   };
-  
-  const handleAllPlayersPass = useCallback(() => {
-    toast({ title: "All players passed!", description: "Drawing a new card for each player."});
-    
-    let nextDeck = [...deck];
-    const updatedPlayers = players.map(p => {
-        const newHand = [...p.hand];
-        if (nextDeck.length > 0) {
-            newHand.push(nextDeck.shift()!);
-        }
-        return {...p, hand: newHand, passed: false };
-    });
-    
-    setDeck(nextDeck);
-    setPlayers(updatedPlayers);
-    setEquation([]);
-    setUsedCardIndices(new Set());
-    setCurrentPlayerIndex(0);
-    setGameState('playerTurn');
-  }, [deck, players, toast]);
 
-  const determineRoundWinner = useCallback((currentPlayers: Player[]) => {
-    const highestScore = Math.max(...currentPlayers.map(p => p.roundScore));
-    const winners = currentPlayers.filter(p => p.roundScore === highestScore);
-    
-    setRoundWinner(winners);
-
-    const nextPlayers = currentPlayers.map(p => ({
-        ...p,
-        totalScore: p.totalScore + p.roundScore,
-    }));
-    
-    setPlayers(nextPlayers);
-    setGameState('roundOver');
-  }, []);
-
-  const switchTurn = () => {
-    setEquation([]);
-    setUsedCardIndices(new Set());
-    
-    const nextPlayerIndex = (currentPlayerIndex + 1) % numberOfPlayers;
-    
-    let nextDeck = [...deck];
-    if (nextDeck.length > 0) {
-      const updatedPlayers = [...players];
-      updatedPlayers[nextPlayerIndex].hand.push(nextDeck.shift()!);
-      setPlayers(updatedPlayers);
-      setDeck(nextDeck);
-      toast({title: `${players[nextPlayerIndex].name} Drew a Card`, description: `A new card has been added to ${players[nextPlayerIndex].name}'s hand.`});
+  const handlePass = async () => {
+    if (!isMyTurn || !localPlayer) return;
+    try {
+      await gameActions.passTurn({ gameId, playerId: localPlayer.id });
+      setEquation([]);
+      setUsedCardIndices(new Set());
+    } catch(e: any) {
+       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
-
-    setCurrentPlayerIndex(nextPlayerIndex);
-    setGameState('playerTurn');
-    if (numberOfPlayers > 1) {
-      setShowTurnInterstitial(true);
-    }
-  };
-
-  const endPlayerTurn = (result: number, cardsUsedCount: number, passed: boolean) => {
-    const newScore = passed ? 0 : calculateScore(result, targetNumber, cardsUsedCount);
-    
-    const updatedPlayers = players.map((p, index) => {
-        if (index === currentPlayerIndex) {
-            return { ...p, roundScore: newScore, finalResult: result, equation: passed ? [] : equation, passed: passed };
-        }
-        return p;
-    });
-
-    setPlayers(updatedPlayers);
-
-    if (updatedPlayers.every(p => p.passed)) {
-        handleAllPlayersPass();
-        return;
-    }
-
-    if (currentPlayerIndex === numberOfPlayers - 1) { // Last player's turn
-        determineRoundWinner(updatedPlayers);
-    } else {
-        switchTurn();
-    }
-  };
-
-  const handlePass = () => {
-    if (gameState !== 'playerTurn' || !currentPlayer) return;
-    endPlayerTurn(0, 0, true);
   };
   
-  const handleSubmitEquation = () => {
-    if (gameState !== 'playerTurn' || !currentPlayer) return;
+  const handleSubmitEquation = async () => {
+    if (!isMyTurn || !localPlayer) return;
 
-    if (gameMode === 'easy') {
+    if (game.gameMode === 'easy') {
       if (equation.length < 3) return;
       if (equation.filter(term => typeof term === 'string').length === 0) {
         toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
@@ -254,7 +140,7 @@ export default function GameClient() {
       }
     }
 
-    const result = evaluateEquation(equation, gameMode);
+    const result = evaluateEquation(equation, game.gameMode);
 
     if (typeof result === 'object' && result.error) {
         toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
@@ -262,42 +148,81 @@ export default function GameClient() {
     }
     
     if (typeof result === 'number') {
-      endPlayerTurn(result, usedCardIndices.size, false);
-    }
-  };
-
-  const totalWinner = useMemo(() => {
-    if (gameState !== 'gameOver') return [];
-    if (players.length === 0) return [];
-    const maxScore = Math.max(...players.map(p => p.totalScore));
-    return players.filter(p => p.totalScore === maxScore);
-  }, [players, gameState]);
-
-  useEffect(() => {
-    if (gameState === 'gameOver' && !showConfetti) {
-        const player1Won = totalWinner.some(w => w.id === 0);
-        if(player1Won) {
-          setShowConfetti(true);
-        }
-    }
-  }, [gameState, showConfetti, totalWinner]);
-
-
-  const handleNextRound = () => {
-    if (currentRound >= TOTAL_ROUNDS) {
-      setGameState('gameOver');
-    } else {
-      setCurrentRound(prev => prev + 1);
-      startNewRound(gameMode, numberOfPlayers, players);
+      try {
+        await gameActions.submitEquation({
+          gameId,
+          playerId: localPlayer.id,
+          equation,
+          result,
+          cardsUsedCount: usedCardIndices.size,
+        });
+        setEquation([]);
+        setUsedCardIndices(new Set());
+      } catch (e: any) {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      }
     }
   };
   
-  const handleNewGameClick = () => {
-    startNewGame(gameMode, numberOfPlayers);
+  const handleStartGame = async () => {
+    if (!game || game.players.length < 2) {
+      toast({ title: "Not enough players", description: "You need at least 2 players to start.", variant: 'destructive' });
+      return;
+    }
+    if (game.creatorId !== localPlayer?.id) {
+       toast({ title: "Only the creator can start the game", variant: 'destructive' });
+       return;
+    }
+    await gameActions.startGame({ gameId, gameMode: 'easy', numberOfPlayers: game.players.length });
+  };
+  
+  const handleSetGameMode = async (mode: 'easy' | 'pro') => {
+    if (game?.creatorId === localPlayer?.id) {
+        await gameActions.setGameMode({gameId, mode});
+    }
+  }
+
+  const totalWinner = useMemo(() => {
+    if (game?.gameState !== 'gameOver' || !players) return [];
+    if (players.length === 0) return [];
+    const maxScore = Math.max(...players.map(p => p.totalScore));
+    return players.filter(p => p.totalScore === maxScore);
+  }, [players, game]);
+  
+  useEffect(() => {
+    if (game?.gameState === 'gameOver' && !showConfetti) {
+        const playerIsWinner = totalWinner.some(w => w.id === localPlayer?.id);
+        if (playerIsWinner) {
+          setShowConfetti(true);
+        }
+    }
+  }, [game, showConfetti, totalWinner, localPlayer]);
+  
+  const handleNextRound = async () => {
+     if (game && game.creatorId === localPlayer?.id) {
+        await gameActions.nextRound({gameId});
+     }
+  };
+  
+  const handleNewGameClick = async () => {
+    try {
+      const newGameId = await createGame({ creatorName: localPlayerName });
+      if (newGameId) {
+        router.push(`/game/${newGameId}?player=${encodeURIComponent(localPlayerName)}`);
+      }
+    } catch(e) {
+        console.error('Failed to create game:', e);
+        toast({ title: 'Failed to create game', description: 'Please try again.', variant: 'destructive' });
+    }
   }
 
   const handleBackToMenu = () => {
-    setGameState('playerSelection');
+    router.push('/');
+  }
+  
+  const copyGameId = () => {
+    navigator.clipboard.writeText(gameId);
+    toast({title: "Game ID Copied!", description: "Share it with your friends to join."});
   }
 
   const equationString = useMemo(() => equation.map((term, i) => (
@@ -305,60 +230,72 @@ export default function GameClient() {
   )), [equation]);
   
   const targetEquation = useMemo(() => {
-    if (!targetCards || targetCards.length === 0) return null;
-    const CARD_VALUES = getCardValues(gameMode);
-    if (gameMode === 'easy') {
-      return targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
+    if (!game || !game.targetCards || game.targetCards.length === 0) return null;
+    const CARD_VALUES = getCardValues(game.gameMode);
+    if (game.gameMode === 'easy') {
+      return game.targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
     }
-    // For pro mode, just show the cards
     return null;
-  }, [targetCards, gameMode]);
-
+  }, [game]);
+  
   const renderRoundWinner = () => {
-    if (!roundWinner || roundWinner.length === 0) return null;
-    if (roundWinner.length > 1) {
+    if (!game || !game.roundWinnerIds || game.roundWinnerIds.length === 0 || !players) return null;
+    const winners = players.filter(p => game.roundWinnerIds?.includes(p.id));
+    if (winners.length > 1) {
         return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
     }
-    return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{roundWinner[0].name} Wins This Round!</p>;
+    return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winners[0].name} Wins This Round!</p>;
   };
+  
+  if (loading || !game || !players || !localPlayer) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-xl text-muted-foreground">Loading Game...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const isPlayerTurn = gameState === 'playerTurn';
-
-  if (gameState === 'playerSelection') {
+  if (game.gameState === 'lobby') {
     return (
       <div className="container mx-auto p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-150px)]">
-        <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95 w-full max-w-md">
+        <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95 w-full max-w-lg">
           <CardHeader>
-            <CardTitle className="text-4xl font-headline">Game Setup</CardTitle>
+            <CardTitle className="text-4xl font-headline">Game Lobby</CardTitle>
+            <CardDescription className="text-lg">Waiting for players to join...</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-8">
             <div className="space-y-4">
-                <Label htmlFor="num-players" className="text-xl">Number of Players</Label>
-                <div className="flex items-center gap-4">
-                    <Slider
-                        id="num-players"
-                        min={2}
-                        max={8}
-                        step={1}
-                        value={[numberOfPlayers]}
-                        onValueChange={(value) => setNumberOfPlayers(value[0])}
-                    />
-                    <span className="text-2xl font-bold w-12 text-center">{numberOfPlayers}</span>
-                </div>
+              <Button onClick={copyGameId} variant="outline" className="w-full text-lg">
+                <Copy className="mr-2 h-5 w-5" /> Game ID: {gameId}
+              </Button>
             </div>
-            <div className="space-y-4">
+             <div className="space-y-4">
+              <h3 className="text-2xl font-bold">Players ({players.length}/{game.maxPlayers})</h3>
+              <div className="grid gap-2">
+                {players.map(p => <div key={p.id} className="text-xl p-2 bg-muted rounded-md">{p.name} {p.id === game.creatorId && '(Creator)'}</div>)}
+              </div>
+            </div>
+            {localPlayer.id === game.creatorId && (
+              <div className="space-y-4">
                 <Label className="text-xl">Game Mode</Label>
                 <div className="flex flex-col md:flex-row gap-4">
-                    <Button onClick={() => startNewGame('easy', numberOfPlayers)} size="lg" className="h-24 text-2xl w-full">
+                    <Button onClick={() => handleSetGameMode('easy')} size="lg" className={cn("h-24 text-2xl w-full", game.gameMode === 'easy' && 'ring-4 ring-primary')}>
                       <Baby className="mr-4 h-8 w-8" />
                       Easy
                     </Button>
-                    <Button onClick={() => startNewGame('pro', numberOfPlayers)} size="lg" className="h-24 text-2xl w-full" variant="destructive">
+                    <Button onClick={() => handleSetGameMode('pro')} size="lg" className={cn("h-24 text-2xl w-full", game.gameMode === 'pro' && 'ring-4 ring-primary')} variant="destructive">
                        <BrainCircuit className="mr-4 h-8 w-8" />
                        Pro
                     </Button>
                 </div>
-            </div>
+              </div>
+            )}
+            <Button onClick={handleStartGame} size="lg" className="text-2xl">
+              Start Game
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -369,14 +306,14 @@ export default function GameClient() {
     <div className="container mx-auto p-4 md:p-8 space-y-6">
       {showConfetti && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
-        <Card className="text-center p-4 shadow-lg w-full md:w-auto">
+        <Card className="text-center p-4 shadow-lg w-full">
           <CardHeader className="p-0 mb-2">
-            <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {currentRound}/{TOTAL_ROUNDS})</CardTitle>
+            <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {game.currentRound}/{game.totalRounds})</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 grid gap-2" style={{gridTemplateColumns: `repeat(${numberOfPlayers}, 1fr)`}}>
+          <CardContent className="p-0 grid gap-4" style={{gridTemplateColumns: `repeat(${players.length}, minmax(0, 1fr))`}}>
               {players.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-lg font-bold">
-                    <User /> {p.name.replace('Player ', 'P')}: <span className="text-primary">{p.totalScore}</span>
+                <div key={p.id} className={cn("flex items-center gap-2 text-lg font-bold p-2 rounded-md", p.id === currentPlayer?.id && "bg-primary/20")}>
+                    <User /> {p.name.split(' ')[0]}: <span className="text-primary">{p.totalScore}</span>
                 </div>
               ))}
           </CardContent>
@@ -396,7 +333,7 @@ export default function GameClient() {
                 <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex items-center justify-center gap-2">
-                <p className="text-6xl font-bold text-primary">{targetNumber}</p>
+                <p className="text-6xl font-bold text-primary">{game.targetNumber}</p>
                 <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
                 <Lightbulb className="h-6 w-6" />
                 <span className="sr-only">Show hint</span>
@@ -404,10 +341,6 @@ export default function GameClient() {
             </CardContent>
             </Card>
         </div>
-
-        <div className="w-full md:w-auto" />
-
-
       </div>
 
       <AlertDialog open={showHint} onOpenChange={setShowHint}>
@@ -419,18 +352,18 @@ export default function GameClient() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
-              {targetCards.map((card, index) => (
-                <GameCard key={index} card={card} mode={gameMode} />
+              {game.targetCards.map((card, index) => (
+                <GameCard key={index} card={card} mode={game.gameMode} />
               ))}
           </div>
            {targetEquation && (
             <p className="text-center text-2xl font-bold">
-              {targetEquation} = <span className="text-primary">{targetNumber}</span>
+              {targetEquation} = <span className="text-primary">{game.targetNumber}</span>
             </p>
           )}
-          {gameMode === 'pro' && (
+          {game.gameMode === 'pro' && (
              <p className="text-center text-2xl font-bold">
-                Concatenated to form <span className="text-primary">{targetNumber}</span>
+                Concatenated to form <span className="text-primary">{game.targetNumber}</span>
              </p>
           )}
           <AlertDialogFooter>
@@ -439,24 +372,7 @@ export default function GameClient() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showTurnInterstitial} onOpenChange={setShowTurnInterstitial}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-headline text-4xl text-center">{players[(currentPlayerIndex)]?.name}'s Turn!</AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-lg">
-              Pass the device to {players[currentPlayerIndex]?.name}. A new card has been added to their hand.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex justify-center items-center gap-2 my-4">
-            <Users className="w-16 h-16 text-primary" />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowTurnInterstitial(false)}>Start Turn</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {gameState === 'gameOver' && (
+      {game.gameState === 'gameOver' && (
          <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
            <CardTitle className="text-5xl font-headline mb-4 flex items-center justify-center gap-4"><Trophy className="w-12 h-12 text-yellow-400" />Game Over!</CardTitle>
            {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It's a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
@@ -469,13 +385,13 @@ export default function GameClient() {
               ))}
            </div>
           
-           <Button onClick={() => setGameState('playerSelection')} size="lg" className="mt-8">Play Again</Button>
+           <Button onClick={handleNewGameClick} size="lg" className="mt-8">Play Again</Button>
          </Card>
        )}
 
-      {gameState === 'roundOver' && (
+      {game.gameState === 'roundOver' && (
         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
-          <CardTitle className="text-4xl font-headline mb-4">Round {currentRound} Over!</CardTitle>
+          <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {renderRoundWinner()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
             {players.map(player => (
@@ -496,18 +412,18 @@ export default function GameClient() {
                 </div>
             ))}
           </div>
-          <Button onClick={handleNextRound} size="lg" className="mt-8">
-            {currentRound >= TOTAL_ROUNDS ? 'Show Final Results' : 'Next Round'}
+          <Button onClick={handleNextRound} size="lg" className="mt-8" disabled={game.creatorId !== localPlayer.id}>
+            {game.currentRound >= game.totalRounds ? 'Show Final Results' : 'Next Round'}
           </Button>
         </Card>
       )}
       
-      {isPlayerTurn && currentPlayer && (
+      {isMyTurn && (
         <Card className="shadow-lg sticky top-4 z-10 bg-card/90 backdrop-blur-sm p-3 max-w-md mx-auto">
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               <User />
-              {currentPlayer.name}'s Turn ({gameMode} mode)
+              Your Turn! ({game.gameMode} mode)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 pt-3">
@@ -515,7 +431,7 @@ export default function GameClient() {
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
             <div className="flex items-center justify-between gap-2 mt-3">
-              <div className={cn("grid grid-cols-2 gap-2", gameMode !== 'pro' && "hidden")}>
+              <div className={cn("grid grid-cols-2 gap-2", game.gameMode !== 'pro' && "hidden")}>
                 <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
                 <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
@@ -535,34 +451,39 @@ export default function GameClient() {
         </Card>
       )}
 
-      {isPlayerTurn && currentPlayer && (
-        <div className="space-y-4 pt-4">
-            <div>
-              <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
-                <User />
-                {currentPlayer.name}'s Hand
-              </h2>
-              <div className="flex flex-wrap justify-center gap-2 md:gap-4">
-                {activeHand.map((card, index) => (
-                  <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
-                    <GameCard
-                      card={card}
-                      mode={gameMode}
-                      onClick={() => handleCardClick(card, index)}
-                      className={cn(
-                        'transition-all duration-200',
-                        usedCardIndices.has(index) && "opacity-30 scale-90 -translate-y-4 cursor-not-allowed",
-                        !isPlayerTurn && "cursor-not-allowed"
-                      )}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-        </div>
+      {!isMyTurn && game.gameState === 'playerTurn' && (
+        <Card className="text-center p-4 max-w-md mx-auto shadow-lg">
+          <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl">
+            <Users />
+            Waiting for {currentPlayer?.name} to play...
+          </CardTitle>
+        </Card>
       )}
+
+      <div className="space-y-4 pt-4">
+          <div>
+            <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
+              <User />
+              Your Hand
+            </h2>
+            <div className="flex flex-wrap justify-center gap-2 md:gap-4">
+              {activeHand.map((card, index) => (
+                <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
+                  <GameCard
+                    card={card}
+                    mode={game.gameMode}
+                    onClick={() => handleCardClick(card, index)}
+                    className={cn(
+                      'transition-all duration-200',
+                      usedCardIndices.has(index) && "opacity-30 scale-90 -translate-y-4 cursor-not-allowed",
+                      !isMyTurn && "cursor-not-allowed"
+                    )}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+      </div>
     </div>
   );
 }
-
-    

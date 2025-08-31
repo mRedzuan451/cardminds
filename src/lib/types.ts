@@ -14,7 +14,7 @@ export type EquationTerm = number | string; // e.g., 5, '+', 10
 export type GameMode = 'easy' | 'pro';
 
 export interface Player {
-    id: number;
+    id: string; // Corresponds to Firebase Auth UID in the future
     name: string;
     hand: Hand;
     roundScore: number;
@@ -22,4 +22,23 @@ export interface Player {
     passed: boolean;
     finalResult: number;
     equation: EquationTerm[];
+}
+
+export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver';
+
+export interface Game {
+    id: string;
+    creatorId: string;
+    gameState: GameState;
+    gameMode: GameMode;
+    players: string[]; // list of player IDs
+    maxPlayers: number;
+    deck: Card[];
+    targetNumber: number;
+    targetCards: Card[];
+    currentPlayerId: string;
+    currentRound: number;
+    totalRounds: number;
+    roundWinnerIds?: string[];
+    passCount: number;
 }
