@@ -8,8 +8,6 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { EquationTerm, Hand } from '@/lib/types';
-import { CARD_VALUES } from '@/lib/game';
 import { z } from 'genkit';
 
 const CardSchema = z.object({
@@ -20,12 +18,13 @@ const CardSchema = z.object({
 const BotInputSchema = z.object({
   hand: z.array(CardSchema).describe("The bot's current hand of cards."),
   target: z.number().describe('The target number the bot should aim for.'),
+  drawsRemaining: z.number().describe('How many times the bot can still draw a card this round.'),
 });
 export type BotInput = z.infer<typeof BotInputSchema>;
 
 const BotOutputSchema = z.object({
-    shouldPass: z.boolean().describe('Whether the bot has decided to pass its turn.'),
-    equation: z.array(z.union([z.string(), z.number()])).describe('The equation the bot wants to play. Empty if passing.'),
+    action: z.enum(['play', 'draw', 'pass']).describe('The action the bot wants to take.'),
+    equation: z.array(z.union([z.string(), z.number()])).describe('The equation the bot wants to play. Empty if passing or drawing.'),
     reasoning: z.string().describe('A brief explanation of why the bot made this decision.'),
 });
 export type BotOutput = z.infer<typeof BotOutputSchema>;
@@ -47,10 +46,11 @@ Here are the rules for card values:
 An equation must alternate between numbers and operators (e.g., 7 + 1). It must contain at least one operator.
 
 Based on the hand of cards you are given and the target number, you must decide on the best possible move. Your options are:
-1.  **Play an Equation**: Find the combination of cards in your hand that forms an equation resulting in a number closest to the target. Your response should include this equation.
-2.  **Pass**: If you absolutely cannot form any valid equation with the cards in your hand, you can choose to pass your turn. Otherwise, you should always play a move.
+1.  **Play an Equation**: Find the combination of cards in your hand that forms an equation resulting in a number closest to the target. Your response should include this equation and the action 'play'. If you find an equation that exactly matches the target, you MUST play it.
+2.  **Draw a Card**: If you cannot find a perfect match, but believe drawing a card could significantly improve your chances, you can choose to draw. This is a good strategy if your current best result is far from the target and you have draws remaining. Your response should be the action 'draw'.
+3.  **Pass**: If you cannot form any valid equation, or if you have a very close result and don't want to risk drawing a worse card, you can pass. Passing ends your turn for the round. This should be your last resort or a strategic move if you are confident in your current score potential. Your response should be the action 'pass'.
 
-Analyze your hand carefully. Evaluate different combinations to find the one that minimizes the difference from the target. Return your decision as a structured JSON object. Provide a brief reasoning for your choice. For example, if you find a perfect solution, your reasoning might be "Found an equation that exactly matches the target." If you pass, it must be because "No valid equations can be formed with the current hand."
+Analyze your hand carefully. Evaluate different combinations. Your primary goal is to exactly match the target. If you cannot, get as close as possible. Your decision to draw should be based on the potential for improvement. Provide a brief reasoning for your choice.
 `;
 
 const prompt = ai.definePrompt({
@@ -58,7 +58,7 @@ const prompt = ai.definePrompt({
   input: { schema: BotInputSchema },
   output: { schema: BotOutputSchema },
   system: botSystemPrompt,
-  prompt: `My hand is: {{json hand}}. The target is {{target}}. What is my best move?`,
+  prompt: `My hand is: {{json hand}}. The target is {{target}}. I have {{drawsRemaining}} draws left. What is my best move?`,
 });
 
 

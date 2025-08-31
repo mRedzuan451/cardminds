@@ -44,7 +44,9 @@ export default function GameClient() {
   const [botEquation, setBotEquation] = useState<EquationTerm[]>([]);
   
   const [showHint, setShowHint] = useState(false);
-  const [drawsRemaining, setDrawsRemaining] = useState(MAX_DRAWS);
+  const [humanDrawsRemaining, setHumanDrawsRemaining] = useState(MAX_DRAWS);
+  const [botDrawsRemaining, setBotDrawsRemaining] = useState(MAX_DRAWS);
+  
   const [winner, setWinner] = useState<Player | 'draw' | null>(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
   
@@ -69,7 +71,8 @@ export default function GameClient() {
     setWinner(null);
     setGameState('playerTurn');
     setShowHint(false);
-    setDrawsRemaining(MAX_DRAWS);
+    setHumanDrawsRemaining(MAX_DRAWS);
+    setBotDrawsRemaining(MAX_DRAWS);
   }, []);
 
   useEffect(() => {
@@ -112,7 +115,12 @@ export default function GameClient() {
   const handleSubmitEquation = () => {
     if (gameState !== 'playerTurn' || equation.length === 0) return;
 
-    if (equation.length > 0 && typeof CARD_VALUES[humanHand[Array.from(usedCardIndices)[0]].rank] === 'number' && equation.length < 3) {
+    if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
+      toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
+      return;
+    }
+
+    if (equation.filter(term => typeof term === 'string').length === 0) {
       toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
       return;
     }
@@ -131,7 +139,7 @@ export default function GameClient() {
   
   const handlePassAndDraw = () => {
     if (gameState !== 'playerTurn') return;
-    if (drawsRemaining <= 0) {
+    if (humanDrawsRemaining <= 0) {
       toast({ title: "No draws left!", description: "You cannot draw any more cards this round.", variant: "destructive" });
       return;
     }
@@ -146,8 +154,8 @@ export default function GameClient() {
     const [newCard, ...restOfDeck] = deck;
     setHumanHand([...humanHand, newCard]);
     setDeck(restOfDeck);
-    setDrawsRemaining(drawsRemaining - 1);
-    toast({ title: "Passed Turn", description: "You drew a new card. You can continue building your equation or submit." });
+    setHumanDrawsRemaining(humanDrawsRemaining - 1);
+    toast({ title: "Drew a Card", description: "You drew a new card." });
   };
 
   const determineWinner = useCallback(() => {
@@ -164,54 +172,86 @@ export default function GameClient() {
   const executeBotTurn = useCallback(async () => {
     setIsBotThinking(true);
     try {
-      const botResult = await findBestEquation({ hand: botHand, target: targetNumber });
+      const botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsRemaining: botDrawsRemaining });
       
-      if (botResult.shouldPass || botResult.equation.length === 0) {
-        toast({
-          title: "Bot Passed",
-          description: botResult.reasoning,
-        });
-        setBotScore(0);
-        setBotFinalResult(0);
-        setBotEquation([]);
-      } else {
-        const botEq = botResult.equation;
-        const evaluation = evaluateEquation(botEq as EquationTerm[]);
-        if (typeof evaluation === 'number') {
-          const score = calculateScore(evaluation, targetNumber, botEq.length);
-          setBotScore(score);
-          setBotFinalResult(evaluation);
-          setBotEquation(botEq as EquationTerm[]);
+      switch(botResponse.action) {
+        case 'play':
+          const botEq = botResponse.equation;
+          const evaluation = evaluateEquation(botEq as EquationTerm[]);
+          if (typeof evaluation === 'number') {
+            const score = calculateScore(evaluation, targetNumber, botEq.length);
+            setBotScore(score);
+            setBotFinalResult(evaluation);
+            setBotEquation(botEq as EquationTerm[]);
+            toast({
+              title: "Bot Played an Equation!",
+              description: botResponse.reasoning,
+            });
+            determineWinner();
+          } else {
+            // Bot failed to create a valid equation, treat as a pass
+            toast({
+              title: "Bot failed",
+              description: "The bot tried to make a move but failed.",
+              variant: "destructive"
+            });
+            setBotScore(0);
+            setBotFinalResult(0);
+            setBotEquation([]);
+            determineWinner();
+          }
+          break;
+        case 'draw':
+          if (botDrawsRemaining > 0 && deck.length > 0 && botHand.length < 10) {
+            const [newCard, ...restOfDeck] = deck;
+            setBotHand(prevHand => [...prevHand, newCard]);
+            setDeck(restOfDeck);
+            setBotDrawsRemaining(prev => prev - 1);
+            toast({
+              title: "Bot Drew a Card",
+              description: botResponse.reasoning,
+            });
+            // Rerun bot's turn after drawing
+            setTimeout(() => executeBotTurn(), 1500); 
+          } else {
+            // Cannot draw, so just pass
+            toast({ title: "Bot Passed", description: "Bot wanted to draw but couldn't." });
+            setBotScore(0);
+            setBotFinalResult(0);
+            setBotEquation([]);
+            determineWinner();
+          }
+          break;
+        case 'pass':
           toast({
-            title: "Bot Played an Equation!",
-            description: botResult.reasoning,
+            title: "Bot Passed",
+            description: botResponse.reasoning,
           });
-        } else {
-          // Bot failed to create a valid equation, treat as a pass
           setBotScore(0);
           setBotFinalResult(0);
           setBotEquation([]);
-          toast({
-            title: "Bot failed",
-            description: "The bot tried to make a move but failed.",
-            variant: "destructive"
-          });
-        }
+          determineWinner();
+          break;
       }
     } catch (error) {
       console.error("Bot AI error:", error);
       setBotScore(0); // Penalize bot for error
       toast({ title: "Bot Error", description: "The bot encountered an error and passed its turn.", variant: "destructive"});
-    } finally {
-      setIsBotThinking(false);
       determineWinner();
+    } finally {
+      if (gameState !== 'botTurn') {
+        setIsBotThinking(false);
+      }
     }
-  }, [botHand, targetNumber, determineWinner]);
+  }, [botHand, targetNumber, botDrawsRemaining, deck, determineWinner, gameState]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
+      setIsBotThinking(true);
       const timer = setTimeout(() => executeBotTurn(), 1500); // Give a slight delay for realism
       return () => clearTimeout(timer);
+    } else {
+      setIsBotThinking(false);
     }
   }, [gameState, executeBotTurn]);
 
@@ -335,8 +375,8 @@ export default function GameClient() {
                   <LogOut className="mr-2 h-4 w-4"/> Pass Turn
                 </Button>
               )}
-              <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={drawsRemaining <= 0}>
-                <SkipForward className="mr-2 h-4 w-4"/> Draw Card <Badge variant="outline" className="ml-2">{drawsRemaining} left</Badge>
+              <Button onClick={handlePassAndDraw} variant="secondary" className="flex-grow" disabled={humanDrawsRemaining <= 0}>
+                <SkipForward className="mr-2 h-4 w-4"/> Draw Card <Badge variant="outline" className="ml-2">{humanDrawsRemaining} left</Badge>
               </Button>
               <Button onClick={handleClearEquation} variant="destructive" size="icon" disabled={equation.length === 0}>
                 <X className="h-4 w-4"/>
