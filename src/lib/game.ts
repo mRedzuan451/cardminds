@@ -73,7 +73,7 @@ function generateEasyTarget(deck: Card[]): { target: number; cardsUsed: Card[], 
         const equation = [term1, operator, term3];
 
         try {
-            const evalResult = evaluateEquation(equation);
+            const evalResult = evaluateEquation(equation, 'easy');
             if (typeof evalResult === 'number') {
                 result = evalResult;
             } else {
@@ -118,10 +118,38 @@ export function generateTarget(deck: Card[], mode: 'easy' | 'pro'): { target: nu
   return generateEasyTarget(deck);
 }
 
-export function evaluateEquation(equation: EquationTerm[]): number | { error: string } {
+export function evaluateEquation(equation: EquationTerm[], mode: GameMode): number | { error: string } {
   if (equation.length === 0) return { error: "Equation is empty." };
 
-  const equationString = equation.join(' ');
+  let processedEquation = [...equation];
+  
+  if (mode === 'pro') {
+    const newEquation: EquationTerm[] = [];
+    for (let i = 0; i < processedEquation.length; i++) {
+        newEquation.push(processedEquation[i]);
+        const currentTerm = processedEquation[i];
+        const nextTerm = processedEquation[i + 1];
+
+        // Case 1: (x)y -> (x)*y  e.g. [')', 5]
+        const isClosingParen = currentTerm === ')';
+        const isNextTermNumber = typeof nextTerm === 'number';
+        if (isClosingParen && isNextTermNumber) {
+            newEquation.push('*');
+            continue;
+        }
+
+        // Case 2: x(y) -> x*(y) e.g. [5, '(']
+        const isCurrentTermNumber = typeof currentTerm === 'number';
+        const isOpeningParen = nextTerm === '(';
+        if (isCurrentTermNumber && isOpeningParen) {
+            newEquation.push('*');
+        }
+    }
+    processedEquation = newEquation;
+  }
+  
+  const equationString = processedEquation.join(' ');
+
   try {
     // Basic validation to prevent arbitrary code execution
     const safeCharsRegex = /^[0-9+\-*/().\s]+$/;

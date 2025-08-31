@@ -256,7 +256,7 @@ export default function GameClient() {
     }
 
 
-    const result = evaluateEquation(equation);
+    const result = evaluateEquation(equation, gameMode);
 
     if (typeof result === 'object' && result.error) {
         toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
@@ -300,15 +300,15 @@ export default function GameClient() {
   }
 
   const equationString = useMemo(() => equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
   )), [equation]);
   
   const player1EquationString = useMemo(() => player1Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
   )), [player1Equation]);
 
   const player2EquationString = useMemo(() => player2Equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
   )), [player2Equation]);
 
   const targetEquation = useMemo(() => {
@@ -514,13 +514,9 @@ export default function GameClient() {
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
             <div className="flex items-center justify-between gap-2 mt-3">
-              <div className={cn("grid grid-cols-3 gap-2", gameMode === 'pro' && "grid-cols-2")}>
-                {gameMode === 'pro' && (
-                  <>
-                    <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
-                    <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
-                  </>
-                )}
+              <div className={cn("grid grid-cols-2 gap-2", gameMode !== 'pro' && "hidden")}>
+                <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
+                <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length === 0}>
