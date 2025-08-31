@@ -163,7 +163,7 @@ export default function GameClient() {
   
   const executeBotTurn = useCallback(async () => {
     if (gameState !== 'botTurn') {
-      setIsBotThinking(false);
+      if (isBotThinking) setIsBotThinking(false);
       return;
     }
 
@@ -172,7 +172,7 @@ export default function GameClient() {
     try {
       botResponse = await findBestEquation({ hand: botHand, target: targetNumber, drawsLeft: botDrawsLeft });
 
-      if (gameState !== 'botTurn') { // Check again in case state changed during API call
+      if (gameState !== 'botTurn') {
         setIsBotThinking(false);
         return;
       }
@@ -203,10 +203,8 @@ export default function GameClient() {
           setDeck(restOfDeck);
           setBotDrawsLeft(botDrawsLeft - 1);
           
-          // Bot gets to think again after drawing
           setTimeout(() => executeBotTurn(), 2000); 
         } else {
-          // Can't draw, so just pass
           setBotScore(0);
           determineWinner(humanScore, 0);
         }
@@ -225,15 +223,15 @@ export default function GameClient() {
         determineWinner(humanScore, 0);
       }
     } finally {
-        if (gameState !== 'botTurn' || (botResponse && botResponse.action !== 'draw')) {
+        if (!botResponse || botResponse.action !== 'draw') {
             setIsBotThinking(false);
         }
     }
-  }, [botHand, targetNumber, botDrawsLeft, determineWinner, gameState, toast, humanScore, deck]);
+  }, [botHand, targetNumber, botDrawsLeft, determineWinner, gameState, toast, humanScore, deck, isBotThinking]);
 
   useEffect(() => {
     if (gameState === 'botTurn') {
-      const timer = setTimeout(() => executeBotTurn(), 1500); // Give a slight delay for realism
+      const timer = setTimeout(() => executeBotTurn(), 1500); 
       return () => clearTimeout(timer);
     }
   }, [gameState, executeBotTurn]);
