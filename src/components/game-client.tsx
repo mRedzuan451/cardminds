@@ -128,26 +128,26 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
-  const determineRoundWinner = useCallback((p1Score: number, p2Score: number) => {
+  const determineRoundWinner = useCallback(() => {
     let winner: Player | 'draw' | null = null;
-    if (p1Score > p2Score) {
+    if (player1RoundScore > player2RoundScore) {
       winner = 'Player 1';
-    } else if (p2Score > p1Score) {
+    } else if (player2RoundScore > player1RoundScore) {
       winner = 'Player 2';
     } else {
       winner = 'draw';
     }
     setRoundWinner(winner);
 
-    setPlayer1TotalScore(prev => prev + p1Score);
-    setPlayer2TotalScore(prev => prev + p2Score);
+    setPlayer1TotalScore(prev => prev + player1RoundScore);
+    setPlayer2TotalScore(prev => prev + player2RoundScore);
 
     if (currentRound >= TOTAL_ROUNDS) {
       setGameState('gameOver');
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound]);
+  }, [currentRound, player1RoundScore, player2RoundScore]);
 
   const switchTurn = () => {
     setEquation([]);
@@ -172,7 +172,8 @@ export default function GameClient() {
       setPlayer2FinalResult(result);
       setPlayer2Equation(equation);
       setPlayer2Passed(passed);
-      determineRoundWinner(player1RoundScore, newScore);
+      // Now that both players have played, determine the winner.
+      determineRoundWinner();
     }
   };
 
@@ -223,6 +224,14 @@ export default function GameClient() {
   };
 
   useEffect(() => {
+    if (gameState === 'gameOver' && player1TotalScore !== 0 && player2TotalScore !== 0) {
+      if (player1TotalScore > player2TotalScore) {
+        setShowConfetti(true);
+      }
+    }
+  }, [gameState, player1TotalScore, player2TotalScore]);
+
+  useEffect(() => {
     if (gameState === 'roundOver' || gameState === 'gameOver') {
       // Nothing to do here
     } else if (currentPlayer === 'Player 2' && gameState === 'player1Turn') {
@@ -231,14 +240,6 @@ export default function GameClient() {
     }
   }, [gameState, currentPlayer]);
 
-
-  useEffect(() => {
-    if (gameState === 'gameOver' && player1TotalScore !== 0 && player2TotalScore !== 0) {
-      if (player1TotalScore > player2TotalScore) {
-        setShowConfetti(true);
-      }
-    }
-  }, [gameState, player1TotalScore, player2TotalScore]);
 
   const handleNextRound = () => {
     setCurrentRound(prev => prev + 1);
@@ -283,21 +284,8 @@ export default function GameClient() {
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
       {showConfetti && totalWinner === 'Player 1' && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
         <Card className="text-center p-4 shadow-lg w-full md:w-auto">
-          <CardHeader className="p-0 mb-1">
-            <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 flex items-center gap-2">
-            <p className="text-5xl font-bold text-primary">{targetNumber}</p>
-            <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
-              <Lightbulb className="h-6 w-6" />
-              <span className="sr-only">Show hint</span>
-            </Button>
-          </CardContent>
-        </Card>
-        
-        <Card className="text-center p-4 shadow-lg flex-grow">
           <CardHeader className="p-0 mb-2">
             <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {currentRound}/{TOTAL_ROUNDS})</CardTitle>
           </CardHeader>
@@ -310,6 +298,22 @@ export default function GameClient() {
               </div>
           </CardContent>
         </Card>
+        
+        <div className="w-full md:w-auto flex-grow flex justify-center">
+            <Card className="text-center p-4 shadow-lg w-full max-w-xs">
+            <CardHeader className="p-0 mb-1">
+                <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex items-center justify-center gap-2">
+                <p className="text-6xl font-bold text-primary">{targetNumber}</p>
+                <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
+                <Lightbulb className="h-6 w-6" />
+                <span className="sr-only">Show hint</span>
+                </Button>
+            </CardContent>
+            </Card>
+        </div>
+
 
         <Button onClick={startNewGame} size="lg" className="shadow-lg w-full md:w-auto">
           <RefreshCw className="mr-2 h-5 w-5"/> New Game
@@ -409,7 +413,7 @@ export default function GameClient() {
       )}
       
       {isPlayerTurn && (
-        <Card className="shadow-lg sticky top-[88px] z-10 bg-card/90 backdrop-blur-sm p-3">
+        <Card className="shadow-lg sticky top-4 z-10 bg-card/90 backdrop-blur-sm p-3 max-w-md mx-auto">
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               {currentPlayer === 'Player 1' ? <User /> : <Users />}
@@ -442,9 +446,9 @@ export default function GameClient() {
       )}
 
       {isPlayerTurn && (
-        <div className="space-y-8">
+        <div className="space-y-4 pt-4">
             <div>
-              <h2 className="text-2xl font-bold font-headline mb-4 mt-8 flex items-center gap-2">
+              <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
                 {currentPlayer === 'Player 1' ? <User /> : <Users />}
                 {currentPlayer}'s Hand
               </h2>
