@@ -123,13 +123,13 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
-  const determineRoundWinner = useCallback(() => {
-    setPlayer1TotalScore(prev => prev + player1RoundScore);
-    setPlayer2TotalScore(prev => prev + player2RoundScore);
+  const determineRoundWinner = useCallback((p1Score: number, p2Score: number) => {
+    setPlayer1TotalScore(prev => prev + p1Score);
+    setPlayer2TotalScore(prev => prev + p2Score);
 
-    if (player1RoundScore > player2RoundScore) {
+    if (p1Score > p2Score) {
       setRoundWinner('Player 1');
-    } else if (player2RoundScore > player1RoundScore) {
+    } else if (p2Score > p1Score) {
       setRoundWinner('Player 2');
     } else {
       setRoundWinner('draw');
@@ -140,20 +140,15 @@ export default function GameClient() {
     } else {
       setGameState('roundOver');
     }
-  }, [currentRound, player1RoundScore, player2RoundScore]);
+  }, [currentRound]);
 
   const switchTurn = () => {
     setEquation([]);
     setUsedCardIndices(new Set());
     setDrawsLeft(MAX_DRAWS);
-    if (currentPlayer === 'Player 1') {
-      setCurrentPlayer('Player 2');
-      setGameState('player2Turn');
-      setShowTurnInterstitial(true);
-    } else {
-      // Player 2 finished, end of round
-      determineRoundWinner();
-    }
+    setCurrentPlayer('Player 2');
+    setGameState('player2Turn');
+    setShowTurnInterstitial(true);
   };
 
   const endPlayerTurn = (result: number, cardsUsedCount: number) => {
@@ -168,7 +163,7 @@ export default function GameClient() {
       setPlayer2RoundScore(newScore);
       setPlayer2FinalResult(result);
       setPlayer2Equation(equation);
-      determineRoundWinner();
+      determineRoundWinner(player1RoundScore, newScore);
     }
   };
 
