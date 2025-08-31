@@ -123,6 +123,25 @@ export default function GameClient() {
     setUsedCardIndices(new Set());
   };
   
+  const determineRoundWinner = useCallback(() => {
+    setPlayer1TotalScore(prev => prev + player1RoundScore);
+    setPlayer2TotalScore(prev => prev + player2RoundScore);
+
+    if (player1RoundScore > player2RoundScore) {
+      setRoundWinner('Player 1');
+    } else if (player2RoundScore > player1RoundScore) {
+      setRoundWinner('Player 2');
+    } else {
+      setRoundWinner('draw');
+    }
+
+    if (currentRound >= TOTAL_ROUNDS) {
+      setGameState('gameOver');
+    } else {
+      setGameState('roundOver');
+    }
+  }, [currentRound, player1RoundScore, player2RoundScore]);
+
   const switchTurn = () => {
     setEquation([]);
     setUsedCardIndices(new Set());
@@ -199,27 +218,18 @@ export default function GameClient() {
     }
   };
 
-  const determineRoundWinner = useCallback(() => {
-    setPlayer1TotalScore(prev => prev + player1RoundScore);
-    setPlayer2TotalScore(prev => prev + player2RoundScore);
-
-    if (player1RoundScore > player2RoundScore) {
-      setRoundWinner('Player 1');
-    } else if (player2RoundScore > player1RoundScore) {
-      setRoundWinner('Player 2');
-    } else {
-      setRoundWinner('draw');
+  useEffect(() => {
+    if (gameState === 'roundOver' || gameState === 'gameOver') {
+      // Nothing to do here
+    } else if (currentPlayer === 'Player 2' && gameState === 'player1Turn') {
+      // This is an invalid state, P2 is current player but it's P1's turn state. Resetting.
+      setCurrentPlayer('Player 1');
     }
+  }, [gameState, currentPlayer]);
 
-    if (currentRound >= TOTAL_ROUNDS) {
-      setGameState('gameOver');
-    } else {
-      setGameState('roundOver');
-    }
-  }, [currentRound, player1RoundScore, player2RoundScore]);
 
   useEffect(() => {
-    if (gameState === 'gameOver') {
+    if (gameState === 'gameOver' && player1TotalScore !== 0 && player2TotalScore !== 0) {
       if (player1TotalScore > player2TotalScore) {
         setShowConfetti(true);
       }
