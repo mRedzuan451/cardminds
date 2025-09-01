@@ -199,56 +199,46 @@ async function advanceTurn(gameId: string) {
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
         
         // ========== LOGIC PHASE ==========
+        
+        // 1. Check if all players have passed. This is the condition to end the round.
+        const allPlayersPassed = players.every(p => p.passed);
 
-        // 1. Check for a round winner. This is the highest priority.
-        const highestScore = Math.max(...players.map(p => p.roundScore));
-        if (highestScore > 0) {
+        if (allPlayersPassed) {
+            // End of the round. Tally scores.
+            const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
+            
+            // It's possible for everyone to pass and score 0, which is a draw with no points.
+            const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
+
             players.forEach(p => {
                 const playerRef = doc(db, 'games', gameId, 'players', p.id);
                 transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
             });
+
             transaction.update(gameRef, {
                 gameState: 'roundOver',
-                roundWinnerIds: winners.map(w => w.id),
+                roundWinnerIds,
             });
             return; // End the transaction, round is over.
         }
 
-        // 2. If no winner, check if all players have passed.
-        const playersWhoHaveNotPassed = players.filter(p => !p.passed);
-        if (playersWhoHaveNotPassed.length === 0) {
-            // "All-pass" condition met. Reset passed status and deal a card to the current player.
-            let newDeck = game.deck;
-            players.forEach(p => {
-                const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                transaction.update(playerRef, { passed: false });
-            });
-            
-            const currentPlayerRef = doc(db, 'games', gameId, 'players', game.currentPlayerId);
-            const currentPlayer = players.find(p => p.id === game.currentPlayerId)!;
-            const newHand = [...currentPlayer.hand];
-            if (newDeck.length > 0) {
-                newHand.push(newDeck.shift()!);
-            }
-            transaction.update(currentPlayerRef, { hand: newHand });
-            transaction.update(gameRef, { 
-                deck: newDeck,
-                // The turn stays with the same player, they just get a new card.
-                currentPlayerId: game.currentPlayerId 
-            });
-            return; // End the transaction.
-        }
-
-        // 3. If there are still active players, advance to the next one.
+        // 2. If the round is not over, advance to the next player who hasn't passed.
         const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
         let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
         let nextPlayerId = game.players[nextPlayerIndex];
         
-        // Find the next player who hasn't passed
+        let loopCount = 0; // Failsafe to prevent infinite loops
         while(players.find(p => p.id === nextPlayerId)?.passed) {
             nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
             nextPlayerId = game.players[nextPlayerIndex];
+            loopCount++;
+            if (loopCount > players.length) {
+                // This should not happen if the allPlayersPassed check is working correctly.
+                console.error("Infinite loop detected in advanceTurn. Forcing round over.");
+                transaction.update(gameRef, { gameState: 'roundOver', roundWinnerIds: [] });
+                return;
+            }
         }
         
         const nextPlayer = players.find(p => p.id === nextPlayerId);
@@ -416,3 +406,5 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
 
     return newGameId;
 });
+
+    
