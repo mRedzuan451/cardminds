@@ -103,6 +103,7 @@ export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameI
   const q = query(playersRef, where("name", "==", playerName));
   const querySnapshot = await getDocs(q);
   if (!querySnapshot.empty) {
+      console.error(`[joinGame] Error: Player name '${playerName}' already exists in game '${gameId}'.`);
       throw new Error("A player with this name is already in the game.");
   }
 
@@ -180,8 +181,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
       if (firstPlayerDoc) {
-          const dealtHand = freshDeck.splice(0,5); // This represents the hand dealt in the loop above for this player
-          const startingHand = dealtHand.slice(0,5); // Re-create the 5-card hand
+          const startingHand = firstPlayerDoc.hand.slice(0,5); 
           const newHand = [...startingHand, freshDeck.shift()!];
           transaction.update(firstPlayerRef, { hand: newHand });
           console.log(`[startGame] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
@@ -219,7 +219,7 @@ async function advanceTurn(gameId: string) {
         
         // ========== LOGIC PHASE ==========
         
-        // 1. Check if all players have passed. This is the condition to end the round.
+        // 1. Check if all players have acted (passed or submitted). This is the condition to end the round.
         const allPlayersHaveActed = players.every(p => p.passed);
 
         if (allPlayersHaveActed) {
@@ -308,8 +308,8 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
       console.log(`[playerAction] Player ${playerId} submitted. Result: ${result}, Target: ${game.targetNumber}, Cards: ${cardsUsedCount}. Calculated Score: ${newScore}`);
       transaction.update(playerRef, {
         roundScore: newScore,
-        finalResult: newScore > 0 ? result : 0,
-        equation: newScore > 0 ? equation : [],
+        finalResult: result,
+        equation: equation,
         passed: true, // Submitting also means you are done for the turn cycle
       });
     } else { // action === 'pass'
@@ -369,8 +369,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
       if (firstPlayerDoc) {
-          const dealtHand = freshDeck.splice(0,5); // This represents the hand dealt in the loop above for this player
-          const startingHand = dealtHand.slice(0,5); // Re-create the 5-card hand
+          const startingHand = firstPlayerDoc.hand.slice(0,5);
           const newHand = [...startingHand, freshDeck.shift()!];
           transaction.update(firstPlayerRef, { hand: newHand });
           console.log(`[nextRound] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
@@ -431,6 +430,8 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
     batch.set(newGameRef, newGameData);
     
     for (const player of players) {
+        // Need to check for existing player name in the new game lobby to prevent duplicates.
+        // For simplicity in rematch, we assume names are unique from the original game.
         const newPlayerRef = doc(db, 'games', newGameId, 'players', player.id);
         const newPlayerData: Player = {
             id: player.id,
@@ -451,5 +452,7 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
     console.log(`[rematch] New game ${newGameId} created successfully.`);
     return newGameId;
 });
+
+    
 
     

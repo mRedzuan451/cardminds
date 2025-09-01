@@ -140,10 +140,13 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
   
   const handleSubmitEquation = async () => {
-    if (!isMyTurn || !localPlayer) return;
+    if (!isMyTurn || !localPlayer || !game) return;
 
     if (game.gameMode === 'easy') {
-      if (equation.length < 3) return;
+      if (equation.length < 3) {
+        toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
+        return;
+      }
       if (equation.filter(term => typeof term === 'string').length === 0) {
         toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
         return;
@@ -220,6 +223,10 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
   
   const handleNewGameClick = async () => {
+    if (!localPlayerName) {
+      toast({ title: 'Player name not found', description: 'Cannot create a new game.', variant: 'destructive' });
+      return;
+    }
     try {
       const newGameId = await gameActions.createGame({ creatorName: localPlayerName });
       if (newGameId) {
@@ -271,6 +278,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     const winners = players.filter(p => game.roundWinnerIds?.includes(p.id));
     if (winners.length > 1) {
         return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
+    }
+    if (winners.length === 0) {
+      return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">No winner this round!</p>;
     }
     return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winners[0].name} Wins This Round!</p>;
   };
@@ -449,7 +459,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                   <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
                   <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                     Equation:
-                    {player.roundScore > 0 && player.equation.length > 0 ? (
+                    {player.equation.length > 0 ? (
                       <>
                       {player.equation.map((term, i) => (
                         <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
@@ -537,3 +547,5 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
+
+    
