@@ -123,38 +123,40 @@ export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: Set
 
 export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId, gameMode }) => {
   const gameRef = doc(db, 'games', gameId);
-  const playersRef = collection(db, 'games', gameId, 'players');
   
   await runTransaction(db, async (transaction) => {
       const gameDoc = await transaction.get(gameRef);
       if (!gameDoc.exists()) throw new Error("Game not found");
       const game = gameDoc.data() as Game;
 
-      const deckCount = game.players.length > 4 ? 2 : 1;
+      const playersRef = collection(db, 'games', gameId, 'players');
+      const playerDocs = await getDocs(playersRef);
+      const players = playerDocs.docs.map(doc => ({ ...doc.data(), id: doc.id } as Player));
+
+      const deckCount = players.length > 4 ? 2 : 1;
       let freshDeck = shuffleDeck(createDeck(deckCount));
       const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, gameMode);
 
       freshDeck = updatedDeck;
       
-      const playerDocs = await getDocs(playersRef);
-      const batch = writeBatch(db);
-
-      playerDocs.forEach(playerDoc => {
+      players.forEach(player => {
           const hand = freshDeck.splice(0, 5);
-          batch.update(playerDoc.ref, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
+          const playerRef = doc(db, 'games', gameId, 'players', player.id);
+          transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
       });
 
       // Player 1 draws a card to start
       const firstPlayerId = game.players[0];
-      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      if (freshDeck.length > 0) {
-        const firstPlayerDoc = await transaction.get(firstPlayerRef);
-        const firstPlayerData = firstPlayerDoc.data() as Player;
-        const newHand = [...firstPlayerData.hand, freshDeck.shift()!];
-        batch.update(firstPlayerRef, { hand: newHand });
+      if (firstPlayerId && freshDeck.length > 0) {
+        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+        const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
+        if(firstPlayerDoc) {
+            const newHand = [...firstPlayerDoc.hand, ...freshDeck.splice(0,5), freshDeck.shift()!];
+            transaction.update(firstPlayerRef, { hand: newHand });
+        }
       }
 
-      batch.update(gameRef, {
+      transaction.update(gameRef, {
         gameState: 'playerTurn',
         deck: freshDeck,
         targetNumber: target,
@@ -163,8 +165,6 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
         currentRound: 1,
         passCount: 0
       });
-      
-      await batch.commit();
   });
 });
 
@@ -183,52 +183,49 @@ async function advanceTurn(gameId: string) {
 
         const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
         const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+        const nextPlayerId = game.players[nextPlayerIndex];
 
         // Check if all players have passed
         const allPlayersPassed = players.every(p => p.passed);
         if (allPlayersPassed) {
-             const batch = writeBatch(db);
              players.forEach(p => {
                  const newHand = [...p.hand];
                  if (game.deck.length > 0) {
                      newHand.push(game.deck.shift()!);
                  }
                  const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                 batch.update(playerRef, { hand: newHand, passed: false });
+                 transaction.update(playerRef, { hand: newHand, passed: false });
              });
-             batch.update(gameRef, { currentPlayerId: game.players[0], passCount: 0, deck: game.deck });
-             await batch.commit();
+             transaction.update(gameRef, { currentPlayerId: game.players[0], passCount: 0, deck: game.deck });
              return;
         }
-        
-        // If it's the end of the line of players for the round
-        if (nextPlayerIndex === 0) {
+
+        const isRoundOver = players.filter(p => !p.passed).length === 0;
+
+        if (isRoundOver) {
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             
-            const batch = writeBatch(db);
             players.forEach(p => {
                 const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                batch.update(playerRef, { totalScore: p.totalScore + p.roundScore });
+                transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
             });
 
-            batch.update(gameRef, {
+            transaction.update(gameRef, {
                 gameState: 'roundOver',
                 roundWinnerIds: winners.map(w => w.id),
             });
-            await batch.commit();
         } else { // It's just the next player's turn
-            const nextPlayerId = game.players[nextPlayerIndex];
             const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-            const nextPlayerDoc = await transaction.get(nextPlayerRef);
-            const nextPlayerData = nextPlayerDoc.data() as Player;
+            const nextPlayerDoc = players.find(p => p.id === nextPlayerId);
             
-            const newHand = [...nextPlayerData.hand];
-            if (game.deck.length > 0) {
-                newHand.push(game.deck.shift()!);
+            if (nextPlayerDoc) {
+                const newHand = [...nextPlayerDoc.hand];
+                if (game.deck.length > 0) {
+                    newHand.push(game.deck.shift()!);
+                }
+                transaction.update(nextPlayerRef, { hand: newHand });
             }
-            
-            transaction.update(nextPlayerRef, { hand: newHand });
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck });
         }
     });
@@ -250,7 +247,7 @@ export const submitEquation = ai.defineFlow({ name: 'submitEquation', inputSchem
       roundScore: newScore,
       finalResult: result,
       equation: equation,
-      passed: false,
+      passed: true, // Mark as passed to signify turn is over
     });
   });
   await advanceTurn(gameId);
@@ -293,24 +290,23 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
 
     freshDeck = updatedDeck;
 
-    const batch = writeBatch(db);
-
     players.forEach(p => {
         const hand = freshDeck.splice(0, 5);
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
-        batch.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
+        transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
     
     // Start of new round, first player draws a card
     const firstPlayerId = game.players[0];
-    const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-    if (freshDeck.length > 0) {
-      const firstPlayerDoc = players.find(p => p.id === firstPlayerId)!;
-      const newHand = [...firstPlayerDoc.hand, ...freshDeck.splice(0,1)];
-      batch.update(firstPlayerRef, { hand: newHand });
+    if (firstPlayerId && freshDeck.length > 0) {
+        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+        const firstPlayerDoc = players.find(p => p.id === firstPlayerId)!;
+        const currentHand = firstPlayerDoc.hand.length > 0 ? firstPlayerDoc.hand : freshDeck.splice(0,5);
+        const newHand = [...currentHand, freshDeck.shift()!];
+        transaction.update(firstPlayerRef, { hand: newHand });
     }
 
-    batch.update(gameRef, {
+    transaction.update(gameRef, {
       gameState: 'playerTurn',
       deck: freshDeck,
       targetNumber: target,
@@ -320,8 +316,5 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       passCount: 0,
       roundWinnerIds: [],
     });
-
-    await batch.commit();
   });
 });
-
