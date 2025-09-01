@@ -230,7 +230,8 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
                     }
                     transaction.update(playerRef, { passed: false, hand: newHand });
                 });
-
+                
+                // Turn stays with the current player who triggered the "all-pass"
                 transaction.update(gameRef, { 
                     passCount: 0,
                     deck: newDeck,
@@ -258,7 +259,7 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
                   newHand.push(game.deck.shift()!);
               }
               transaction.update(nextPlayerRef, { hand: newHand });
-              transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck, passCount: 0 });
+              transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck, passCount: game.passCount + 1 });
             }
         }
     });
