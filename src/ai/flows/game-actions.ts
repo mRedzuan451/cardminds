@@ -170,23 +170,12 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     
     // Deal 5 cards to each player
     players.forEach(p => {
-        const hand = freshDeck.splice(0, 5);
+        const cardsToDeal = p.id === firstPlayerId ? 6 : 5;
+        const hand = freshDeck.splice(0, cardsToDeal);
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
-    console.log(`[startGame] Dealt 5 cards to each player.`);
-
-    // The first player draws a card to start their turn
-    if (freshDeck.length > 0) {
-      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
-      if (firstPlayerDoc) {
-          const startingHand = firstPlayerDoc.hand.slice(0,5); 
-          const newHand = [...startingHand, freshDeck.shift()!];
-          transaction.update(firstPlayerRef, { hand: newHand });
-          console.log(`[startGame] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
-      }
-    }
+    console.log(`[startGame] Dealt cards to players. First player received 6, others 5.`);
 
     transaction.update(gameRef, {
         gameState: 'playerTurn',
