@@ -157,8 +157,11 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     
     const firstPlayerId = game.players[0];
     
+    // Deal 5 cards to each player
+    const playerHands = new Map<string, any[]>();
     players.forEach(player => {
         const hand = freshDeck.splice(0, 5);
+        playerHands.set(player.id, hand);
         const playerRef = doc(db, 'games', gameId, 'players', player.id);
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
@@ -166,10 +169,8 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     // The first player draws a card to start their turn
     if (freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayer = players.find(p => p.id === firstPlayerId)!;
-      // Note: hand was just dealt above, so it has 5 cards.
-      const handDealtAbove = playerDocsSnap.docs.find(d => d.id === firstPlayerId)?.data().hand ?? [];
-      const newHand = [...handDealtAbove, freshDeck.shift()!];
+      const firstPlayerHand = playerHands.get(firstPlayerId) ?? [];
+      const newHand = [...firstPlayerHand, freshDeck.shift()!];
       transaction.update(firstPlayerRef, { hand: newHand });
     }
 
@@ -197,11 +198,10 @@ async function advanceTurn(gameId: string) {
         const playerDocsSnap = await getDocs(playersQuery);
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
         
-        // This includes the player who just passed/submitted
-        const playersWhoHavePassed = players.filter(p => p.passed);
-        
-        if (playersWhoHavePassed.length === players.length) {
-             // Case 1: ALL players have now passed or submitted. End the round.
+        const playersWhoHaveNotPassed = players.filter(p => !p.passed);
+
+        if (playersWhoHaveNotPassed.length === 0) {
+            // Case 1: ALL players have passed or submitted. End the round if score > 0, otherwise deal new card.
             const highestScore = Math.max(...players.map(p => p.roundScore));
             
             if (highestScore > 0) {
@@ -216,7 +216,7 @@ async function advanceTurn(gameId: string) {
                     roundWinnerIds: winners.map(w => w.id),
                 });
             } else { 
-                // Sub-case 1.2: Everyone passed with 0 score, deal one new card and continue round.
+                // Sub-case 1.2: Everyone passed with 0 score, deal one new card to the current player and continue round.
                 let newDeck = game.deck;
                 
                 // Reset passed status for all players for the new turn cycle
@@ -287,22 +287,12 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     if (action === 'submit') {
       const { equation, result, cardsUsedCount } = input;
       const newScore = calculateScore(result!, game.targetNumber, cardsUsedCount!);
-      if (newScore > 0) {
-          transaction.update(playerRef, {
-            roundScore: newScore,
-            finalResult: result,
-            equation: equation,
-            passed: true, // Submitting also means you are done for the turn cycle
-          });
-      } else {
-          // If score is 0, treat it as a pass
-          transaction.update(playerRef, {
-            roundScore: 0,
-            finalResult: 0,
-            equation: [],
-            passed: true,
-          });
-      }
+      transaction.update(playerRef, {
+        roundScore: newScore,
+        finalResult: newScore > 0 ? result : 0,
+        equation: newScore > 0 ? equation : [],
+        passed: true, // Submitting also means you are done for the turn cycle
+      });
     } else { // action === 'pass'
         transaction.update(playerRef, {
           passed: true, 
@@ -341,18 +331,19 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     freshDeck = updatedDeck;
     
     const firstPlayerId = game.players[0];
-
+    
+    const playerHands = new Map<string, any[]>();
     players.forEach(p => {
         const hand = freshDeck.splice(0, 5);
+        playerHands.set(p.id, hand);
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
 
     if (freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      // We just dealt 5 cards to everyone. We need to grab one more for the first player.
-      const handDealtAbove = playerDocsSnap.docs.find(p => p.id === firstPlayerId)?.data().hand ?? [];
-      const newHand = [...handDealtAbove, freshDeck.shift()!];
+      const firstPlayerHand = playerHands.get(firstPlayerId) ?? [];
+      const newHand = [...firstPlayerHand, freshDeck.shift()!];
       transaction.update(firstPlayerRef, { hand: newHand });
     }
 
