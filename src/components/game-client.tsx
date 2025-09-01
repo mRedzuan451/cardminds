@@ -283,14 +283,27 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
               <div className="space-y-4">
                 <Label className="text-xl">Game Mode</Label>
                 <div className="flex flex-col md:flex-row gap-4">
-                    <Button onClick={() => handleSetGameMode('easy')} size="lg" className={cn("h-24 text-2xl w-full", game.gameMode === 'easy' && 'ring-4 ring-primary')}>
-                      <Baby className="mr-4 h-8 w-8" />
-                      Easy
-                    </Button>
-                    <Button onClick={() => handleSetGameMode('pro')} size="lg" className={cn("h-24 text-2xl w-full", game.gameMode === 'pro' && 'ring-4 ring-primary')} variant="destructive">
-                       <BrainCircuit className="mr-4 h-8 w-8" />
-                       Pro
-                    </Button>
+                  <Button
+                    onClick={() => handleSetGameMode('easy')}
+                    size="lg"
+                    variant={game.gameMode === 'easy' ? 'default' : 'outline'}
+                    className="h-24 text-2xl w-full"
+                  >
+                    <Baby className="mr-4 h-8 w-8" />
+                    Easy
+                  </Button>
+                  <Button
+                    onClick={() => handleSetGameMode('pro')}
+                    size="lg"
+                    variant={game.gameMode === 'pro' ? 'destructive' : 'outline'}
+                    className={cn(
+                      "h-24 text-2xl w-full",
+                       game.gameMode !== 'pro' && "border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    )}
+                  >
+                    <BrainCircuit className="mr-4 h-8 w-8" />
+                    Pro
+                  </Button>
                 </div>
               </div>
             )}
