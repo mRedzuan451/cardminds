@@ -122,53 +122,42 @@ export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: Set
 });
 
 export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId, gameMode }) => {
-  const gameRef = doc(db, 'games', gameId);
-  
-  await runTransaction(db, async (transaction) => {
-      const gameDoc = await transaction.get(gameRef);
-      if (!gameDoc.exists()) throw new Error("Game not found");
-      const game = gameDoc.data() as Game;
+    const gameRef = doc(db, 'games', gameId);
+    
+    await runTransaction(db, async (transaction) => {
+        const gameDoc = await transaction.get(gameRef);
+        if (!gameDoc.exists()) throw new Error("Game not found");
+        const game = gameDoc.data() as Game;
 
-      const playersRef = collection(db, 'games', gameId, 'players');
-      const playerDocs = await getDocs(playersRef);
-      const players = playerDocs.docs.map(doc => ({ ...doc.data(), id: doc.id } as Player));
+        const playersRef = collection(db, 'games', gameId, 'players');
+        const playerDocsSnap = await getDocs(playersRef);
+        const players = playerDocsSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Player));
 
-      const deckCount = players.length > 4 ? 2 : 1;
-      let freshDeck = shuffleDeck(createDeck(deckCount));
-      const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, gameMode);
+        const deckCount = players.length > 4 ? 2 : 1;
+        let freshDeck = shuffleDeck(createDeck(deckCount));
+        const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, gameMode);
 
-      freshDeck = updatedDeck;
-      
-      players.forEach(player => {
-          const hand = freshDeck.splice(0, 5);
-          const playerRef = doc(db, 'games', gameId, 'players', player.id);
-          transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
-      });
+        freshDeck = updatedDeck;
+        
+        players.forEach(player => {
+            const hand = freshDeck.splice(0, 5);
+            const playerRef = doc(db, 'games', gameId, 'players', player.id);
+            transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
+        });
 
-      // Player 1 draws a card to start
-      const firstPlayerId = game.players[0];
-      if (firstPlayerId && freshDeck.length > 0) {
-        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-        const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
-        if(firstPlayerDoc) {
-            const newHand = [...firstPlayerDoc.hand, ...freshDeck.splice(0,5), freshDeck.shift()!];
-            transaction.update(firstPlayerRef, { hand: newHand });
-        }
-      }
-
-      transaction.update(gameRef, {
-        gameState: 'playerTurn',
-        deck: freshDeck,
-        targetNumber: target,
-        targetCards: cardsUsed,
-        currentPlayerId: game.players[0],
-        currentRound: 1,
-        passCount: 0
-      });
-  });
+        transaction.update(gameRef, {
+            gameState: 'playerTurn',
+            deck: freshDeck,
+            targetNumber: target,
+            targetCards: cardsUsed,
+            currentPlayerId: game.players[0],
+            currentRound: 1,
+            passCount: 0,
+        });
+    });
 });
 
-async function advanceTurn(gameId: string) {
+async function advanceTurn(gameId: string, committingPlayerId?: string) {
     await runTransaction(db, async (transaction) => {
         const gameRef = doc(db, 'games', gameId);
         const gameDoc = await transaction.get(gameRef);
@@ -178,31 +167,16 @@ async function advanceTurn(gameId: string) {
         const playersRef = collection(db, 'games', gameId, 'players');
         const playerDocs = await getDocs(playersRef);
         let players = playerDocs.docs.map(d => ({...d.data(), id: d.id})) as Player[];
-        // Reorder players to match game.players array order
+        
+        // Ensure players are in the turn order
         players.sort((a,b) => game.players.indexOf(a.id) - game.players.indexOf(b.id));
 
-        const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
-        const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
-        const nextPlayerId = game.players[nextPlayerIndex];
-
-        // Check if all players have passed
-        const allPlayersPassed = players.every(p => p.passed);
-        if (allPlayersPassed) {
-             players.forEach(p => {
-                 const newHand = [...p.hand];
-                 if (game.deck.length > 0) {
-                     newHand.push(game.deck.shift()!);
-                 }
-                 const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                 transaction.update(playerRef, { hand: newHand, passed: false });
-             });
-             transaction.update(gameRef, { currentPlayerId: game.players[0], passCount: 0, deck: game.deck });
-             return;
-        }
-
-        const isRoundOver = players.filter(p => !p.passed).length === 0;
-
-        if (isRoundOver) {
+        // If a player just submitted, their 'passed' state might not be in the `players` collection yet.
+        // We need to account for it manually.
+        const unpassedPlayerCount = players.filter(p => !p.passed && p.id !== committingPlayerId).length;
+        
+        if (unpassedPlayerCount === 0) {
+            // All players have now finished their turn. The round is over.
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             
@@ -215,22 +189,30 @@ async function advanceTurn(gameId: string) {
                 gameState: 'roundOver',
                 roundWinnerIds: winners.map(w => w.id),
             });
-        } else { // It's just the next player's turn
-            const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-            const nextPlayerDoc = players.find(p => p.id === nextPlayerId);
-            
-            if (nextPlayerDoc) {
-                const newHand = [...nextPlayerDoc.hand];
-                if (game.deck.length > 0) {
-                    newHand.push(game.deck.shift()!);
-                }
-                transaction.update(nextPlayerRef, { hand: newHand });
+        } else { 
+            // It's the next player's turn
+            const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
+            let nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            let nextPlayer = players[nextPlayerIndex];
+
+            // Skip players who have already passed
+            while(nextPlayer.passed) {
+                nextPlayerIndex = (nextPlayerIndex + 1) % players.length;
+                nextPlayer = players[nextPlayerIndex];
             }
+            
+            const nextPlayerId = nextPlayer.id;
+            const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
+            
+            const newHand = [...nextPlayer.hand];
+            if (game.deck.length > 0) {
+                newHand.push(game.deck.shift()!);
+            }
+            transaction.update(nextPlayerRef, { hand: newHand });
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck });
         }
     });
 }
-
 
 export const submitEquation = ai.defineFlow({ name: 'submitEquation', inputSchema: SubmitEquationInputSchema }, async ({ gameId, playerId, equation, result, cardsUsedCount }) => {
   await runTransaction(db, async (transaction) => {
@@ -250,7 +232,7 @@ export const submitEquation = ai.defineFlow({ name: 'submitEquation', inputSchem
       passed: true, // Mark as passed to signify turn is over
     });
   });
-  await advanceTurn(gameId);
+  await advanceTurn(gameId, playerId);
 });
 
 export const passTurn = ai.defineFlow({ name: 'passTurn', inputSchema: PlayerActionInputSchema }, async ({ gameId, playerId }) => {
@@ -265,7 +247,7 @@ export const passTurn = ai.defineFlow({ name: 'passTurn', inputSchema: PlayerAct
         transaction.update(playerRef, { passed: true, equation: [], finalResult: 0, roundScore: 0 });
         transaction.update(gameRef, { passCount: game.passCount + 1 });
     });
-    await advanceTurn(gameId);
+    await advanceTurn(gameId, playerId);
 });
 
 export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
@@ -281,8 +263,8 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     }
     
     const playersRef = collection(db, 'games', gameId, 'players');
-    const playerDocs = await getDocs(playersRef);
-    let players = playerDocs.docs.map(d => ({...d.data(), id: d.id})) as Player[];
+    const playerDocsSnap = await getDocs(playersRef);
+    let players = playerDocsSnap.docs.map(d => ({...d.data(), id: d.id})) as Player[];
 
     const deckCount = players.length > 4 ? 2 : 1;
     let freshDeck = shuffleDeck(createDeck(deckCount));
@@ -302,8 +284,10 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
         const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
         const firstPlayerDoc = players.find(p => p.id === firstPlayerId)!;
         const currentHand = firstPlayerDoc.hand.length > 0 ? firstPlayerDoc.hand : freshDeck.splice(0,5);
-        const newHand = [...currentHand, freshDeck.shift()!];
-        transaction.update(firstPlayerRef, { hand: newHand });
+        if (freshDeck.length > 0) {
+            const newHand = [...currentHand, freshDeck.shift()!];
+            transaction.update(firstPlayerRef, { hand: newHand });
+        }
     }
 
     transaction.update(gameRef, {
