@@ -52,7 +52,7 @@ export default function HomePage() {
   return (
     <div className="relative min-h-[calc(100vh-65px)]">
       <Image
-        src="https://picsum.photos/1920/1080"
+        src="gs://cardcalc.firebasestorage.app/assets/background_welcome_img.png"
         alt="Mystical library background"
         fill
         className="object-cover"
