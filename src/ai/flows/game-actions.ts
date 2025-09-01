@@ -198,71 +198,70 @@ async function advanceTurn(gameId: string) {
         const playerDocsSnap = await getDocs(playersQuery);
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
         
+        // ========== LOGIC PHASE ==========
+
+        // 1. Check for a round winner. This is the highest priority.
+        const highestScore = Math.max(...players.map(p => p.roundScore));
+        if (highestScore > 0) {
+            const winners = players.filter(p => p.roundScore === highestScore);
+            players.forEach(p => {
+                const playerRef = doc(db, 'games', gameId, 'players', p.id);
+                transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
+            });
+            transaction.update(gameRef, {
+                gameState: 'roundOver',
+                roundWinnerIds: winners.map(w => w.id),
+            });
+            return; // End the transaction, round is over.
+        }
+
+        // 2. If no winner, check if all players have passed.
         const playersWhoHaveNotPassed = players.filter(p => !p.passed);
-
         if (playersWhoHaveNotPassed.length === 0) {
-            // Case 1: ALL players have passed or submitted. End the round if score > 0, otherwise deal new card.
-            const highestScore = Math.max(...players.map(p => p.roundScore));
-            
-            if (highestScore > 0) {
-                // Sub-case 1.1: Someone scored, round is over.
-                const winners = players.filter(p => p.roundScore === highestScore);
-                players.forEach(p => {
-                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                    transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
-                });
-                transaction.update(gameRef, {
-                    gameState: 'roundOver',
-                    roundWinnerIds: winners.map(w => w.id),
-                });
-            } else { 
-                // Sub-case 1.2: Everyone passed with 0 score, deal one new card to the current player and continue round.
-                let newDeck = game.deck;
-                
-                // Reset passed status for all players for the new turn cycle
-                players.forEach(p => {
-                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                    transaction.update(playerRef, { passed: false });
-                });
-                
-                // The turn stays with the player who triggered the "all-pass" state.
-                const currentPlayerRef = doc(db, 'games', gameId, 'players', game.currentPlayerId);
-                const currentPlayer = players.find(p => p.id === game.currentPlayerId)!;
-                const newHand = [...currentPlayer.hand];
-                if (newDeck.length > 0) {
-                    newHand.push(newDeck.shift()!);
-                }
-                transaction.update(currentPlayerRef, { hand: newHand });
-
-                transaction.update(gameRef, { 
-                    deck: newDeck,
-                    currentPlayerId: game.currentPlayerId 
-                });
-            }
-        } else {
-             // Case 2: At least one player is still active, advance to the next one.
-            const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
-            let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
-            let nextPlayerId = game.players[nextPlayerIndex];
-            
-            // Find the next player who hasn't passed
-            while(players.find(p => p.id === nextPlayerId)?.passed) {
-                nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
-                nextPlayerId = game.players[nextPlayerIndex];
-            }
-            
-            const nextPlayer = players.find(p => p.id === nextPlayerId);
+            // "All-pass" condition met. Reset passed status and deal a card to the current player.
             let newDeck = game.deck;
-
-            if (nextPlayer) {
-              const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-              const newHand = [...nextPlayer.hand];
-              if (newDeck.length > 0) {
-                  newHand.push(newDeck.shift()!);
-              }
-              transaction.update(nextPlayerRef, { hand: newHand });
-              transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
+            players.forEach(p => {
+                const playerRef = doc(db, 'games', gameId, 'players', p.id);
+                transaction.update(playerRef, { passed: false });
+            });
+            
+            const currentPlayerRef = doc(db, 'games', gameId, 'players', game.currentPlayerId);
+            const currentPlayer = players.find(p => p.id === game.currentPlayerId)!;
+            const newHand = [...currentPlayer.hand];
+            if (newDeck.length > 0) {
+                newHand.push(newDeck.shift()!);
             }
+            transaction.update(currentPlayerRef, { hand: newHand });
+            transaction.update(gameRef, { 
+                deck: newDeck,
+                // The turn stays with the same player, they just get a new card.
+                currentPlayerId: game.currentPlayerId 
+            });
+            return; // End the transaction.
+        }
+
+        // 3. If there are still active players, advance to the next one.
+        const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
+        let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
+        let nextPlayerId = game.players[nextPlayerIndex];
+        
+        // Find the next player who hasn't passed
+        while(players.find(p => p.id === nextPlayerId)?.passed) {
+            nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
+            nextPlayerId = game.players[nextPlayerIndex];
+        }
+        
+        const nextPlayer = players.find(p => p.id === nextPlayerId);
+        let newDeck = game.deck;
+
+        if (nextPlayer) {
+            const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
+            const newHand = [...nextPlayer.hand];
+            if (newDeck.length > 0) {
+                newHand.push(newDeck.shift()!);
+            }
+            transaction.update(nextPlayerRef, { hand: newHand });
+            transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
         }
     });
 }
