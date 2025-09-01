@@ -43,6 +43,7 @@ const PlayerActionInputSchema = z.object({
 
 // Flows
 export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: CreateGameInputSchema, outputSchema: z.string() }, async ({ creatorName }) => {
+  console.log(`[createGame] Attempting to create game for creator: ${creatorName}`);
   let gameId: string;
   let gameDoc;
   let gameRef;
@@ -89,10 +90,12 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
   
   await batch.commit();
 
+  console.log(`[createGame] Successfully created game with ID: ${gameId} and creator ID: ${creatorId}`);
   return gameId;
 });
 
 export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameInputSchema }, async ({ gameId, playerName }) => {
+  console.log(`[joinGame] Player '${playerName}' attempting to join game '${gameId}'`);
   const gameRef = doc(db, 'games', gameId);
   await runTransaction(db, async (transaction) => {
     const gameDoc = await transaction.get(gameRef);
@@ -129,15 +132,18 @@ export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameI
     }
     transaction.set(newPlayerRef, newPlayerData);
     transaction.update(gameRef, { players: arrayUnion(newPlayerId) });
+    console.log(`[joinGame] Player '${playerName}' with ID '${newPlayerId}' successfully joined game '${gameId}'`);
   });
 });
 
 export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: SetGameModeInputSchema}, async ({ gameId, mode }) => {
+    console.log(`[setGameMode] Setting game mode for game '${gameId}' to '${mode}'`);
     const gameRef = doc(db, 'games', gameId);
     await updateDoc(gameRef, { gameMode: mode });
 });
 
 export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId }) => {
+  console.log(`[startGame] Starting game with ID: ${gameId}`);
   await runTransaction(db, async (transaction) => {
     // Read phase
     const gameRef = doc(db, 'games', gameId);
@@ -148,30 +154,35 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     const playersQuery = query(collection(db, 'games', gameId, 'players'));
     const playerDocsSnap = await getDocs(playersQuery);
     const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+    console.log(`[startGame] Found ${players.length} players.`);
 
     // Write phase
     const deckCount = players.length > 4 ? 2 : 1;
     let freshDeck = shuffleDeck(createDeck(deckCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
     freshDeck = updatedDeck;
+    console.log(`[startGame] Generated target: ${target}`);
     
     const firstPlayerId = game.players[0];
     
     // Deal 5 cards to each player
-    const playerHands = new Map<string, any[]>();
-    players.forEach(player => {
+    players.forEach(p => {
         const hand = freshDeck.splice(0, 5);
-        playerHands.set(player.id, hand);
-        const playerRef = doc(db, 'games', gameId, 'players', player.id);
+        const playerRef = doc(db, 'games', gameId, 'players', p.id);
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
+    console.log(`[startGame] Dealt 5 cards to each player.`);
 
     // The first player draws a card to start their turn
     if (freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayerHand = playerHands.get(firstPlayerId) ?? [];
-      const newHand = [...firstPlayerHand, freshDeck.shift()!];
-      transaction.update(firstPlayerRef, { hand: newHand });
+      const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
+      if (firstPlayerDoc) {
+          const firstPlayerHand = firstPlayerDoc.hand.concat(freshDeck.splice(0,5)); // Get hand dealt in this transaction
+          const newHand = [...firstPlayerHand, freshDeck.shift()!];
+          transaction.update(firstPlayerRef, { hand: newHand });
+          console.log(`[startGame] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
+      }
     }
 
     transaction.update(gameRef, {
@@ -182,12 +193,14 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
         currentPlayerId: firstPlayerId,
         currentRound: 1,
     });
+    console.log(`[startGame] Game state set to 'playerTurn'. First player is ${firstPlayerId}.`);
   });
 });
 
 
 async function advanceTurn(gameId: string) {
     await runTransaction(db, async (transaction) => {
+        console.log(`[advanceTurn] Advancing turn for game: ${gameId}`);
         // ========== READ PHASE ==========
         const gameRef = doc(db, 'games', gameId);
         const gameDoc = await transaction.get(gameRef);
@@ -197,6 +210,9 @@ async function advanceTurn(gameId: string) {
         const playersQuery = query(collection(db, 'games', gameId, 'players'));
         const playerDocsSnap = await getDocs(playersQuery);
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+
+        console.log('[advanceTurn] Player statuses:');
+        players.forEach(p => console.log(`  - ${p.name} (ID: ${p.id}): passed=${p.passed}`));
         
         // ========== LOGIC PHASE ==========
         
@@ -204,12 +220,14 @@ async function advanceTurn(gameId: string) {
         const allPlayersPassed = players.every(p => p.passed);
 
         if (allPlayersPassed) {
+            console.log("[advanceTurn] All players have passed. Ending round.");
             // End of the round. Tally scores.
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             
             // It's possible for everyone to pass and score 0, which is a draw with no points.
             const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
+            console.log(`[advanceTurn] Round winners (score > 0): ${roundWinnerIds.join(', ')}`);
 
             players.forEach(p => {
                 const playerRef = doc(db, 'games', gameId, 'players', p.id);
@@ -220,44 +238,50 @@ async function advanceTurn(gameId: string) {
                 gameState: 'roundOver',
                 roundWinnerIds,
             });
+            console.log("[advanceTurn] Game state updated to 'roundOver'.");
             return; // End the transaction, round is over.
         }
 
         // 2. If the round is not over, advance to the next player who hasn't passed.
         const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
         let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
-        let nextPlayerId = game.players[nextPlayerIndex];
         
-        let loopCount = 0; // Failsafe to prevent infinite loops
-        while(players.find(p => p.id === nextPlayerId)?.passed) {
+        let nextPlayerId: string | null = null;
+        
+        // Find the next player who hasn't passed
+        for (let i = 0; i < players.length; i++) {
+            const potentialNextPlayerId = game.players[nextPlayerIndex];
+            const playerDoc = players.find(p => p.id === potentialNextPlayerId);
+            if (playerDoc && !playerDoc.passed) {
+                nextPlayerId = potentialNextPlayerId;
+                break;
+            }
             nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
-            nextPlayerId = game.players[nextPlayerIndex];
-            loopCount++;
-            if (loopCount > players.length) {
-                // This should not happen if the allPlayersPassed check is working correctly.
-                console.error("Infinite loop detected in advanceTurn. Forcing round over.");
-                transaction.update(gameRef, { gameState: 'roundOver', roundWinnerIds: [] });
-                return;
-            }
         }
-        
-        const nextPlayer = players.find(p => p.id === nextPlayerId);
-        let newDeck = game.deck;
 
-        if (nextPlayer) {
+        if (nextPlayerId) {
+            console.log(`[advanceTurn] Next player is ${nextPlayerId}.`);
             const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-            const newHand = [...nextPlayer.hand];
-            if (newDeck.length > 0) {
-                newHand.push(newDeck.shift()!);
+            const nextPlayer = players.find(p => p.id === nextPlayerId!);
+            let newDeck = game.deck;
+
+            if (nextPlayer && newDeck.length > 0) {
+                const newHand = [...nextPlayer.hand, newDeck.shift()!];
+                transaction.update(nextPlayerRef, { hand: newHand });
+                console.log(`[advanceTurn] Dealt a card to ${nextPlayerId}. They now have ${newHand.length} cards.`);
             }
-            transaction.update(nextPlayerRef, { hand: newHand });
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
+            console.log(`[advanceTurn] Game's currentPlayerId updated to ${nextPlayerId}.`);
+        } else {
+             // This case should be handled by the allPlayersPassed check, but as a fallback.
+             console.error("[advanceTurn] Error: Could not find a next player who hasn't passed, but not all players have passed. This indicates a logic issue.");
         }
     });
 }
 
 export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: PlayerActionInputSchema }, async (input) => {
   const { gameId, playerId, action } = input;
+  console.log(`[playerAction] Received action '${action}' from player '${playerId}' in game '${gameId}'.`);
   
   await runTransaction(db, async (transaction) => {
     const gameRef = doc(db, 'games', gameId);
@@ -268,14 +292,14 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     const game = gameDoc.data() as Game;
 
     if (game.currentPlayerId !== playerId) {
-      // It's not this player's turn. Just ignore the action.
-      // We don't want to throw an error because of potential race conditions on the client.
+      console.warn(`[playerAction] Ignoring action from player ${playerId} because it's not their turn.`);
       return;
     }
 
     if (action === 'submit') {
       const { equation, result, cardsUsedCount } = input;
       const newScore = calculateScore(result!, game.targetNumber, cardsUsedCount!);
+      console.log(`[playerAction] Player ${playerId} submitted. Result: ${result}, Target: ${game.targetNumber}, Cards: ${cardsUsedCount}. Calculated Score: ${newScore}`);
       transaction.update(playerRef, {
         roundScore: newScore,
         finalResult: newScore > 0 ? result : 0,
@@ -283,6 +307,7 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         passed: true, // Submitting also means you are done for the turn cycle
       });
     } else { // action === 'pass'
+        console.log(`[playerAction] Player ${playerId} passed.`);
         transaction.update(playerRef, {
           passed: true, 
           equation: [], 
@@ -297,14 +322,17 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
 });
 
 export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
+  console.log(`[nextRound] Starting next round for game ${gameId}.`);
   await runTransaction(db, async (transaction) => {
     // Read phase
     const gameRef = doc(db, 'games', gameId);
     const gameDoc = await transaction.get(gameRef);
     if (!gameDoc.exists()) throw new Error("Game not found");
     let game = gameDoc.data() as Game;
-
+    
+    console.log(`[nextRound] Current round is ${game.currentRound}. Total rounds are ${game.totalRounds}.`);
     if (game.currentRound >= game.totalRounds) {
+      console.log(`[nextRound] Game over. Setting gameState to 'gameOver'.`);
       transaction.update(gameRef, { gameState: 'gameOver' });
       return;
     }
@@ -318,22 +346,28 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     let freshDeck = shuffleDeck(createDeck(deckCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
     freshDeck = updatedDeck;
+    console.log(`[nextRound] New target generated: ${target}`);
     
     const firstPlayerId = game.players[0];
     
-    const playerHands = new Map<string, any[]>();
+    // Reset players for the new round and deal 5 cards
     players.forEach(p => {
         const hand = freshDeck.splice(0, 5);
-        playerHands.set(p.id, hand);
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
+    console.log(`[nextRound] Dealt 5 cards to each player and reset their round state.`);
 
+    // Deal starting card to first player
     if (freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayerHand = playerHands.get(firstPlayerId) ?? [];
-      const newHand = [...firstPlayerHand, freshDeck.shift()!];
-      transaction.update(firstPlayerRef, { hand: newHand });
+      const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
+      if (firstPlayerDoc) {
+          const firstPlayerHand = firstPlayerDoc.hand.concat(freshDeck.splice(0,5)); // Get hand dealt in this transaction
+          const newHand = [...firstPlayerHand, freshDeck.shift()!];
+          transaction.update(firstPlayerRef, { hand: newHand });
+          console.log(`[nextRound] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
+      }
     }
 
     transaction.update(gameRef, {
@@ -345,10 +379,12 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       currentRound: game.currentRound + 1,
       roundWinnerIds: [],
     });
+    console.log(`[nextRound] Round ${game.currentRound + 1} started. Game state is 'playerTurn'.`);
   });
 });
 
 export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInputSchema, outputSchema: z.string() }, async ({ gameId }) => {
+    console.log(`[rematch] Creating a rematch for game ${gameId}`);
     const oldGameRef = doc(db, 'games', gameId);
     const oldGameDoc = await getDoc(oldGameRef);
     if (!oldGameDoc.exists()) throw new Error("Original game not found.");
@@ -367,6 +403,7 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
       newGameRef = doc(db, 'games', newGameId);
       newGameDoc = await getDoc(newGameRef);
     } while (newGameDoc.exists());
+    console.log(`[rematch] New game ID will be ${newGameId}`);
 
     const newGameData: Game = {
       id: newGameId,
@@ -404,7 +441,6 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
     batch.update(oldGameRef, { nextGameId: newGameId });
     await batch.commit();
 
+    console.log(`[rematch] New game ${newGameId} created successfully.`);
     return newGameId;
 });
-
-    
