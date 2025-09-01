@@ -97,6 +97,15 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
 export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameInputSchema }, async ({ gameId, playerName }) => {
   console.log(`[joinGame] Player '${playerName}' attempting to join game '${gameId}'`);
   const gameRef = doc(db, 'games', gameId);
+  const playersRef = collection(db, 'games', gameId, 'players');
+  
+  // Check for existing player name outside of the transaction
+  const q = query(playersRef, where("name", "==", playerName));
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+      throw new Error("A player with this name is already in the game.");
+  }
+
   await runTransaction(db, async (transaction) => {
     const gameDoc = await transaction.get(gameRef);
     if (!gameDoc.exists()) {
@@ -108,13 +117,6 @@ export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameI
     }
     if (game.players.length >= game.maxPlayers) {
         throw new Error("Game is full.");
-    }
-    
-    const playersRef = collection(db, 'games', gameId, 'players');
-    const q = query(playersRef, where("name", "==", playerName));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-        throw new Error("A player with this name is already in the game.");
     }
 
     const newPlayerRef = doc(playersRef);
@@ -178,8 +180,9 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
       if (firstPlayerDoc) {
-          const firstPlayerHand = firstPlayerDoc.hand.concat(freshDeck.splice(0,5)); // Get hand dealt in this transaction
-          const newHand = [...firstPlayerHand, freshDeck.shift()!];
+          const dealtHand = freshDeck.splice(0,5); // This represents the hand dealt in the loop above for this player
+          const startingHand = dealtHand.slice(0,5); // Re-create the 5-card hand
+          const newHand = [...startingHand, freshDeck.shift()!];
           transaction.update(firstPlayerRef, { hand: newHand });
           console.log(`[startGame] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
       }
@@ -212,15 +215,15 @@ async function advanceTurn(gameId: string) {
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
 
         console.log('[advanceTurn] Player statuses:');
-        players.forEach(p => console.log(`  - ${p.name} (ID: ${p.id}): passed=${p.passed}`));
+        players.forEach(p => console.log(`  - ${p.name} (ID: ${p.id}): passed=${p.passed}, roundScore=${p.roundScore}`));
         
         // ========== LOGIC PHASE ==========
         
         // 1. Check if all players have passed. This is the condition to end the round.
-        const allPlayersPassed = players.every(p => p.passed);
+        const allPlayersHaveActed = players.every(p => p.passed);
 
-        if (allPlayersPassed) {
-            console.log("[advanceTurn] All players have passed. Ending round.");
+        if (allPlayersHaveActed) {
+            console.log("[advanceTurn] All players have acted. Ending round.");
             // End of the round. Tally scores.
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
@@ -249,7 +252,7 @@ async function advanceTurn(gameId: string) {
         let nextPlayerId: string | null = null;
         
         // Find the next player who hasn't passed
-        for (let i = 0; i < players.length; i++) {
+        for (let i = 0; i < game.players.length; i++) {
             const potentialNextPlayerId = game.players[nextPlayerIndex];
             const playerDoc = players.find(p => p.id === potentialNextPlayerId);
             if (playerDoc && !playerDoc.passed) {
@@ -273,8 +276,8 @@ async function advanceTurn(gameId: string) {
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
             console.log(`[advanceTurn] Game's currentPlayerId updated to ${nextPlayerId}.`);
         } else {
-             // This case should be handled by the allPlayersPassed check, but as a fallback.
-             console.error("[advanceTurn] Error: Could not find a next player who hasn't passed, but not all players have passed. This indicates a logic issue.");
+             // This case should be handled by the allPlayersHaveActed check, but as a fallback.
+             console.error("[advanceTurn] Error: Could not find a next player who hasn't passed, but not all players have acted. This indicates a logic issue.");
         }
     });
 }
@@ -298,7 +301,10 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
 
     if (action === 'submit') {
       const { equation, result, cardsUsedCount } = input;
-      const newScore = calculateScore(result!, game.targetNumber, cardsUsedCount!);
+      if (equation === undefined || result === undefined || cardsUsedCount === undefined) {
+        throw new Error("Submit action requires equation, result, and cardsUsedCount.");
+      }
+      const newScore = calculateScore(result, game.targetNumber, cardsUsedCount);
       console.log(`[playerAction] Player ${playerId} submitted. Result: ${result}, Target: ${game.targetNumber}, Cards: ${cardsUsedCount}. Calculated Score: ${newScore}`);
       transaction.update(playerRef, {
         roundScore: newScore,
@@ -363,8 +369,9 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
       if (firstPlayerDoc) {
-          const firstPlayerHand = firstPlayerDoc.hand.concat(freshDeck.splice(0,5)); // Get hand dealt in this transaction
-          const newHand = [...firstPlayerHand, freshDeck.shift()!];
+          const dealtHand = freshDeck.splice(0,5); // This represents the hand dealt in the loop above for this player
+          const startingHand = dealtHand.slice(0,5); // Re-create the 5-card hand
+          const newHand = [...startingHand, freshDeck.shift()!];
           transaction.update(firstPlayerRef, { hand: newHand });
           console.log(`[nextRound] Dealt starting card to first player: ${firstPlayerId}. They now have ${newHand.length} cards.`);
       }
@@ -423,7 +430,7 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
     const batch = writeBatch(db);
     batch.set(newGameRef, newGameData);
     
-    players.forEach(player => {
+    for (const player of players) {
         const newPlayerRef = doc(db, 'games', newGameId, 'players', player.id);
         const newPlayerData: Player = {
             id: player.id,
@@ -436,11 +443,13 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
             equation: []
         };
         batch.set(newPlayerRef, newPlayerData);
-    });
-
+    }
+    
     batch.update(oldGameRef, { nextGameId: newGameId });
     await batch.commit();
 
     console.log(`[rematch] New game ${newGameId} created successfully.`);
     return newGameId;
 });
+
+    
