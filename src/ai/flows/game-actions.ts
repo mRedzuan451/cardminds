@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Game actions managed by Genkit flows.
@@ -167,7 +168,6 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayer = players.find(p => p.id === firstPlayerId)!;
       // Note: hand was just dealt above, so it has 5 cards.
-      const currentHand = firstPlayer.hand.length > 0 ? firstPlayer.hand : freshDeck.splice(0, 5);
       const handDealtAbove = playerDocsSnap.docs.find(d => d.id === firstPlayerId)?.data().hand ?? [];
       const newHand = [...handDealtAbove, freshDeck.shift()!];
       transaction.update(firstPlayerRef, { hand: newHand });
@@ -197,10 +197,50 @@ async function advanceTurn(gameId: string) {
         const playerDocsSnap = await getDocs(playersQuery);
         let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
         
-        const activePlayers = players.filter(p => !p.passed);
+        // This includes the player who just passed/submitted
+        const playersWhoHavePassed = players.filter(p => p.passed);
         
-        if (activePlayers.length > 0) {
-            // Case 1: At least one player is still active, advance to the next one.
+        if (playersWhoHavePassed.length === players.length) {
+             // Case 1: ALL players have now passed or submitted. End the round.
+            const highestScore = Math.max(...players.map(p => p.roundScore));
+            
+            if (highestScore > 0) {
+                // Sub-case 1.1: Someone scored, round is over.
+                const winners = players.filter(p => p.roundScore === highestScore);
+                players.forEach(p => {
+                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
+                    transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
+                });
+                transaction.update(gameRef, {
+                    gameState: 'roundOver',
+                    roundWinnerIds: winners.map(w => w.id),
+                });
+            } else { 
+                // Sub-case 1.2: Everyone passed with 0 score, deal one new card and continue round.
+                let newDeck = game.deck;
+                
+                // Reset passed status for all players for the new turn cycle
+                players.forEach(p => {
+                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
+                    transaction.update(playerRef, { passed: false });
+                });
+                
+                // The turn stays with the player who triggered the "all-pass" state.
+                const currentPlayerRef = doc(db, 'games', gameId, 'players', game.currentPlayerId);
+                const currentPlayer = players.find(p => p.id === game.currentPlayerId)!;
+                const newHand = [...currentPlayer.hand];
+                if (newDeck.length > 0) {
+                    newHand.push(newDeck.shift()!);
+                }
+                transaction.update(currentPlayerRef, { hand: newHand });
+
+                transaction.update(gameRef, { 
+                    deck: newDeck,
+                    currentPlayerId: game.currentPlayerId 
+                });
+            }
+        } else {
+             // Case 2: At least one player is still active, advance to the next one.
             const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
             let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
             let nextPlayerId = game.players[nextPlayerIndex];
@@ -222,41 +262,6 @@ async function advanceTurn(gameId: string) {
               }
               transaction.update(nextPlayerRef, { hand: newHand });
               transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
-            }
-
-        } else { // Case 2: All players have now passed or submitted
-            const highestScore = Math.max(...players.map(p => p.roundScore));
-            
-            if (highestScore > 0) {
-                // Sub-case 2.1: Someone scored, round is over.
-                const winners = players.filter(p => p.roundScore === highestScore);
-                players.forEach(p => {
-                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                    transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
-                });
-                transaction.update(gameRef, {
-                    gameState: 'roundOver',
-                    roundWinnerIds: winners.map(w => w.id),
-                });
-
-            } else { 
-                // Sub-case 2.2: Everyone passed with 0 score, deal new cards and continue round.
-                let newDeck = game.deck;
-                players.forEach(p => {
-                    const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                    const newHand = [...p.hand];
-                    if (newDeck.length > 0) {
-                        newHand.push(newDeck.shift()!);
-                    }
-                    // Reset passed status for the new turn cycle
-                    transaction.update(playerRef, { passed: false, hand: newHand });
-                });
-                
-                // The turn stays with the player who triggered the "all-pass" state.
-                transaction.update(gameRef, { 
-                    deck: newDeck,
-                    currentPlayerId: game.currentPlayerId 
-                });
             }
         }
     });
