@@ -56,7 +56,7 @@ export default function HomePage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Gamepad2 className="h-8 w-8" />
           </div>
-          <CardTitle className="text-4xl font-headline">Welcome to CardCalc!</CardTitle>
+          <CardTitle className="text-4xl font-headline">Welcome to CardMinds!</CardTitle>
           <CardDescription className="text-lg">Create a new game or join an existing one.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

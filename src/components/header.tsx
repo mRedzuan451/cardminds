@@ -8,7 +8,7 @@ const Header = () => {
       <Link href="/" className="flex items-center gap-2">
         <Sparkles className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold text-foreground font-headline">
-          CardCalc
+          CardMinds
         </h1>
       </Link>
       <nav>
