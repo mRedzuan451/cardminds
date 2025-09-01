@@ -294,9 +294,14 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 </div>
               </div>
             )}
-            <Button onClick={handleStartGame} size="lg" className="text-2xl" disabled={localPlayer.id !== game.creatorId}>
-              Start Game
-            </Button>
+            <div className="flex gap-4">
+              <Button onClick={handleStartGame} size="lg" className="text-2xl flex-grow" disabled={localPlayer.id !== game.creatorId}>
+                Start Game
+              </Button>
+               <Button onClick={handleBackToMenu} size="lg" className="text-2xl" variant="outline">
+                <ArrowLeft className="mr-2 h-5 w-5"/> Menu
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -488,3 +493,5 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
+
+    
