@@ -40,8 +40,5 @@ export interface Game {
     currentRound: number;
     totalRounds: number;
     roundWinnerIds?: string[];
-    passCount: number;
     nextGameId?: string;
 }
-
-    

@@ -90,6 +90,14 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     return currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
   }, [currentPlayer, localPlayer, game]);
 
+  // Reset equation when turn changes
+  useEffect(() => {
+    if (!isMyTurn) {
+        handleClearEquation();
+    }
+  }, [isMyTurn]);
+
+
   const activeHand = useMemo(() => {
     return localPlayer?.hand ?? [];
   }, [localPlayer]);
@@ -124,9 +132,8 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const handlePass = async () => {
     if (!isMyTurn || !localPlayer) return;
     try {
-      await gameActions.passTurn({ gameId, playerId: localPlayer.id });
-      setEquation([]);
-      setUsedCardIndices(new Set());
+      await gameActions.playerAction({ gameId, playerId: localPlayer.id, action: 'pass' });
+      handleClearEquation();
     } catch(e: any) {
        toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -156,15 +163,15 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     
     if (typeof result === 'number') {
       try {
-        await gameActions.submitEquation({
+        await gameActions.playerAction({
           gameId,
           playerId: localPlayer.id,
+          action: 'submit',
           equation,
           result,
           cardsUsedCount: usedCardIndices.size,
         });
-        setEquation([]);
-        setUsedCardIndices(new Set());
+        handleClearEquation();
       } catch (e: any) {
         toast({ title: "Error", description: e.message, variant: "destructive" });
       }
@@ -315,11 +322,8 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                   <Button
                     onClick={() => handleSetGameMode('pro')}
                     size="lg"
-                    variant={game.gameMode === 'pro' ? 'destructive' : 'outline'}
-                    className={cn(
-                      "h-24 text-2xl w-full",
-                       game.gameMode !== 'pro' && "border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    )}
+                    variant={game.gameMode === 'pro' ? 'default' : 'outline'}
+                    className="h-24 text-2xl w-full border-destructive text-destructive data-[variant=default]:bg-destructive data-[variant=default]:text-destructive-foreground"
                   >
                     <BrainCircuit className="mr-4 h-8 w-8" />
                     Pro
@@ -533,5 +537,3 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
-
-    
