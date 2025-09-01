@@ -15,6 +15,15 @@ import { createDeck, shuffleDeck, generateTarget, calculateScore } from '@/lib/g
 
 const db = getFirestore(firebaseApp);
 
+function generateShortId(length = 6) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
 // Schemas
 const CreateGameInputSchema = z.object({ creatorName: z.string() });
 const GameIdInputSchema = z.object({ gameId: z.string() });
@@ -32,9 +41,15 @@ const SubmitEquationInputSchema = z.object({
 
 // Flows
 export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: CreateGameInputSchema, outputSchema: z.string() }, async ({ creatorName }) => {
-  const gamesRef = collection(db, 'games');
-  const newGameRef = doc(gamesRef);
-  const gameId = newGameRef.id;
+  let gameId: string;
+  let gameDoc;
+  let gameRef;
+
+  do {
+    gameId = generateShortId();
+    gameRef = doc(db, 'games', gameId);
+    gameDoc = await getDoc(gameRef);
+  } while (gameDoc.exists());
 
   const playersRef = collection(db, 'games', gameId, 'players');
   const newPlayerRef = doc(playersRef);
@@ -68,7 +83,7 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
   }
 
   const batch = writeBatch(db);
-  batch.set(newGameRef, initialGameData);
+  batch.set(gameRef, initialGameData);
   batch.set(newPlayerRef, creatorData);
   
   await batch.commit();
@@ -142,14 +157,16 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     players.forEach(player => {
         const hand = freshDeck.splice(0, 5);
         const playerRef = doc(db, 'games', gameId, 'players', player.id);
-        
-        // The first player gets an extra card to start their turn.
-        if (player.id === firstPlayerId && freshDeck.length > 0) {
-          hand.push(freshDeck.shift()!);
-        }
-
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
+    
+    // First player draws a card
+    const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+    const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
+    if (firstPlayerDoc && freshDeck.length > 0) {
+      const newHand = [...firstPlayerDoc.hand, ...freshDeck.splice(0,5), freshDeck.shift()!];
+      transaction.update(firstPlayerRef, { hand: newHand });
+    }
 
     transaction.update(gameRef, {
         gameState: 'playerTurn',
@@ -180,10 +197,10 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
         if (committingPlayer) {
           committingPlayer.passed = true;
         }
+        
+        const allPlayersPassed = players.every(p => p.passed);
 
-        const unpassedPlayers = players.filter(p => !p.passed);
-
-        if (unpassedPlayers.length === 0) {
+        if (allPlayersPassed) {
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             
@@ -210,15 +227,15 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
             }
             
             const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-            const nextPlayerDoc = await transaction.get(nextPlayerRef);
-            const nextPlayerData = nextPlayerDoc.data() as Player;
-
-            const newHand = [...nextPlayerData.hand];
-            if (game.deck.length > 0) {
-                newHand.push(game.deck.shift()!);
+            
+            if (nextPlayer) {
+              const newHand = [...nextPlayer.hand];
+              if (game.deck.length > 0) {
+                  newHand.push(game.deck.shift()!);
+              }
+              transaction.update(nextPlayerRef, { hand: newHand });
+              transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck });
             }
-            transaction.update(nextPlayerRef, { hand: newHand });
-            transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: game.deck });
         }
     });
 }
@@ -285,13 +302,15 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     players.forEach(p => {
         const hand = freshDeck.splice(0, 5);
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
-        
-        if (p.id === firstPlayerId && freshDeck.length > 0) {
-          hand.push(freshDeck.shift()!);
-        }
-        
         transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
     });
+
+    const firstPlayerDoc = players.find(p => p.id === firstPlayerId);
+    if(firstPlayerDoc && freshDeck.length > 0) {
+      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+      const newHand = [...firstPlayerDoc.hand, ...freshDeck.splice(0, 5), freshDeck.shift()!];
+      transaction.update(firstPlayerRef, { hand: newHand });
+    }
 
     transaction.update(gameRef, {
       gameState: 'playerTurn',
