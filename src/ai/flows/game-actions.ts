@@ -247,12 +247,21 @@ export const submitEquation = ai.defineFlow({ name: 'submitEquation', inputSchem
 
     const newScore = calculateScore(result, game.targetNumber, cardsUsedCount);
 
-    transaction.update(playerRef, {
-      roundScore: newScore,
-      finalResult: result,
-      equation: equation,
-      passed: true,
-    });
+    if (newScore > 0) {
+        transaction.update(playerRef, {
+          roundScore: newScore,
+          finalResult: result,
+          equation: equation,
+          passed: true,
+        });
+    } else {
+        transaction.update(playerRef, {
+          roundScore: 0,
+          finalResult: 0,
+          equation: [],
+          passed: true,
+        });
+    }
   });
   await advanceTurn(gameId, playerId);
 });
@@ -316,3 +325,4 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     });
   });
 });
+
