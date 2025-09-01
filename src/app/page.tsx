@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { createGame } from '@/ai/flows/game-actions';
 import { useToast } from '@/hooks/use-toast';
 import { Gamepad2 } from 'lucide-react';
+import Image from 'next/image';
 
 export default function HomePage() {
   const [gameId, setGameId] = useState('');
