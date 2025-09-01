@@ -40,7 +40,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
   const [showHint, setShowHint] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showTurnInterstitial, setShowTurnInterstitial] = useState(false);
+  const [isRematching, setIsRematching] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -51,6 +51,13 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const localPlayer = useMemo(() => players?.find(p => p.name === localPlayerName), [players, localPlayerName]);
 
   const CARD_VALUES = useMemo(() => getCardValues(game?.gameMode ?? 'easy'), [game?.gameMode]);
+
+  useEffect(() => {
+    if (game?.nextGameId) {
+        const playerQueryParam = `?player=${encodeURIComponent(localPlayerName)}`;
+        router.push(`/game/${game.nextGameId}${playerQueryParam}`);
+    }
+  }, [game, router, localPlayerName]);
 
   useEffect(() => {
     if (!loading && !gameDoc?.exists()) {
@@ -215,6 +222,19 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         console.error('Failed to create game:', e);
         toast({ title: 'Failed to create game', description: 'Please try again.', variant: 'destructive' });
     }
+  }
+  
+  const handleRematch = async () => {
+    if (isRematching) return;
+    setIsRematching(true);
+    try {
+        await gameActions.rematch({gameId});
+        toast({ title: "New game created!", description: "Starting a new match with the same players." });
+    } catch(e: any) {
+        console.error('Failed to create rematch:', e);
+        toast({ title: 'Failed to create new game', description: e.message, variant: 'destructive' });
+    }
+    setIsRematching(false);
   }
 
   const handleBackToMenu = () => {
@@ -403,8 +423,15 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 <div key={p.id} className="flex items-center gap-2"><User /> {p.name}: <span className="text-primary">{p.totalScore}</span></div>
               ))}
            </div>
-          
-           <Button onClick={handleNewGameClick} size="lg" className="mt-8">Play Again</Button>
+           
+           {localPlayer.id === game.creatorId ? (
+              <Button onClick={handleRematch} size="lg" className="mt-8" disabled={isRematching}>
+                {isRematching ? 'Creating New Game...' : 'Play Again'}
+              </Button>
+           ) : (
+             <p className="text-xl mt-8 text-muted-foreground">Waiting for {players.find(p=>p.id === game.creatorId)?.name} to start a new game.</p>
+           )}
+
          </Card>
        )}
 
@@ -506,3 +533,5 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
+
+    

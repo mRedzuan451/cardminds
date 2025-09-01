@@ -41,4 +41,7 @@ export interface Game {
     totalRounds: number;
     roundWinnerIds?: string[];
     passCount: number;
+    nextGameId?: string;
 }
+
+    

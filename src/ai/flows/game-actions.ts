@@ -326,3 +326,66 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
   });
 });
 
+export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
+    const oldGameRef = doc(db, 'games', gameId);
+    const oldGameDoc = await getDoc(oldGameRef);
+    if (!oldGameDoc.exists()) throw new Error("Original game not found.");
+    
+    const oldGameData = oldGameDoc.data() as Game;
+    
+    const playersQuery = query(collection(db, 'games', gameId, 'players'));
+    const playerDocsSnap = await getDocs(playersQuery);
+    const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+
+    let newGameId: string;
+    let newGameDoc;
+    let newGameRef;
+    do {
+      newGameId = generateShortId();
+      newGameRef = doc(db, 'games', newGameId);
+      newGameDoc = await getDoc(newGameRef);
+    } while (newGameDoc.exists());
+
+    const newGameData: Game = {
+      id: newGameId,
+      creatorId: oldGameData.creatorId,
+      gameState: 'lobby',
+      gameMode: oldGameData.gameMode,
+      players: oldGameData.players,
+      maxPlayers: oldGameData.maxPlayers,
+      deck: [],
+      targetNumber: 0,
+      targetCards: [],
+      currentPlayerId: oldGameData.creatorId,
+      currentRound: 1,
+      totalRounds: 3,
+      passCount: 0,
+    };
+    
+    const batch = writeBatch(db);
+    batch.set(newGameRef, newGameData);
+    
+    players.forEach(player => {
+        const newPlayerRef = doc(db, 'games', newGameId, 'players', player.id);
+        const newPlayerData: Player = {
+            id: player.id,
+            name: player.name,
+            hand: [],
+            roundScore: 0,
+            totalScore: 0,
+            passed: false,
+            finalResult: 0,
+            equation: []
+        };
+        batch.set(newPlayerRef, newPlayerData);
+    });
+
+    batch.update(oldGameRef, { nextGameId: newGameId });
+    
+    await batch.commit();
+
+    return newGameId;
+});
+
+
+    
