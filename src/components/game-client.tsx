@@ -405,7 +405,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                   <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
                   <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
                     Equation:
-                    {!player.passed ? (
+                    {player.roundScore > 0 && player.equation.length > 0 ? (
                       <>
                       {player.equation.map((term, i) => (
                         <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
@@ -493,5 +493,3 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
-
-    
