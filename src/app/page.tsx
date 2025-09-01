@@ -37,12 +37,12 @@ export default function HomePage() {
   };
 
   const handleJoinGame = () => {
-    if (!gameId) {
-      toast({ title: 'Please enter a Game ID', variant: 'destructive' });
+    if (!playerName) {
+      toast({ title: 'Please enter your name', variant: 'destructive' });
       return;
     }
-     if (!playerName) {
-      toast({ title: 'Please enter your name', variant: 'destructive' });
+    if (!gameId) {
+      toast({ title: 'Please enter a Game ID', variant: 'destructive' });
       return;
     }
     router.push(`/game/${gameId}?player=${encodeURIComponent(playerName)}`);
@@ -70,7 +70,7 @@ export default function HomePage() {
             />
           </div>
           <div className="space-y-4">
-            <Button onClick={handleCreateGame} className="w-full text-lg" size="lg" disabled={isLoading || !playerName}>
+            <Button onClick={handleCreateGame} className="w-full text-lg" size="lg" disabled={isLoading}>
               {isLoading ? 'Creating Game...' : 'Create New Game'}
             </Button>
           </div>
@@ -89,7 +89,7 @@ export default function HomePage() {
                 onChange={(e) => setGameId(e.target.value)}
                 className="text-lg"
               />
-              <Button onClick={handleJoinGame} className="text-lg" disabled={!gameId || !playerName}>Join</Button>
+              <Button onClick={handleJoinGame} className="text-lg">Join</Button>
             </div>
           </div>
         </CardContent>
