@@ -165,15 +165,16 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
   
   const handleStartGame = async () => {
-    if (!game || game.players.length < 2) {
-      toast({ title: "Not enough players", description: "You need at least 2 players to start.", variant: 'destructive' });
+    if (!game || !players) return;
+    if (players.length < 1) {
+      toast({ title: "Not enough players", description: "You need at least 1 player to start.", variant: 'destructive' });
       return;
     }
     if (game.creatorId !== localPlayer?.id) {
        toast({ title: "Only the creator can start the game", variant: 'destructive' });
        return;
     }
-    await gameActions.startGame({ gameId, gameMode: 'easy', numberOfPlayers: game.players.length });
+    await gameActions.startGame({ gameId, gameMode: game.gameMode, numberOfPlayers: game.players.length });
   };
   
   const handleSetGameMode = async (mode: 'easy' | 'pro') => {
@@ -293,7 +294,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 </div>
               </div>
             )}
-            <Button onClick={handleStartGame} size="lg" className="text-2xl">
+            <Button onClick={handleStartGame} size="lg" className="text-2xl" disabled={localPlayer.id !== game.creatorId}>
               Start Game
             </Button>
           </CardContent>
@@ -487,5 +488,3 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
-
-    
