@@ -41,6 +41,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [showHint, setShowHint] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isRematching, setIsRematching] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -65,21 +66,30 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
       router.push('/');
     }
   }, [gameDoc, loading, router, toast]);
+  
+  useEffect(() => {
+    if (localPlayer) {
+      setHasJoined(true);
+    }
+  }, [localPlayer]);
 
   useEffect(() => {
     const join = async () => {
-      if (game && players && !players.find(p => p.name === localPlayerName)) {
-        try {
-          await gameActions.joinGame({ gameId, playerName: localPlayerName });
-          toast({ title: `Joined game!`, description: `Welcome, ${localPlayerName}!`});
-        } catch (e: any) {
-          toast({ title: 'Error joining game', description: e.message, variant: 'destructive' });
-          router.push('/');
+      if (game && players && !hasJoined) {
+        if (!players.find(p => p.name === localPlayerName)) {
+            try {
+              await gameActions.joinGame({ gameId, playerName: localPlayerName });
+              toast({ title: `Joined game!`, description: `Welcome, ${localPlayerName}!`});
+              setHasJoined(true);
+            } catch (e: any) {
+              toast({ title: 'Error joining game', description: e.message, variant: 'destructive' });
+              router.push('/');
+            }
         }
       }
     };
     join();
-  }, [game, players, gameId, localPlayerName, router, toast]);
+  }, [game, players, gameId, localPlayerName, router, toast, hasJoined]);
 
   const currentPlayer = useMemo(() => {
     if (!game || !players || players.length === 0) return null;
