@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Game actions managed by Genkit flows.
- * This file contains all the server-side logic for the CardCalc game.
+ * This file contains all the server-side logic for the CardMinds game.
  * It uses Firebase Firestore to store and manage the game state in real-time.
  */
 
@@ -180,6 +180,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
 
 async function advanceTurn(gameId: string, committingPlayerId?: string) {
     await runTransaction(db, async (transaction) => {
+        // ========== READ PHASE ==========
         const gameRef = doc(db, 'games', gameId);
         const gameDoc = await transaction.get(gameRef);
         if (!gameDoc.exists()) throw new Error("Game not found");
@@ -204,10 +205,11 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
         
         const activePlayers = players.filter(p => !p.passed);
 
+        // ========== WRITE PHASE ==========
         if (activePlayers.length === 0) {
             const highestScore = Math.max(...players.map(p => p.roundScore));
             
-            // Check if anyone has actually scored. If everyone has 0, it's a pass-around.
+            // Case 1: Someone scored, round is over.
             if (highestScore > 0) {
                 const winners = players.filter(p => p.roundScore === highestScore);
                 players.forEach(p => {
@@ -218,8 +220,7 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
                     gameState: 'roundOver',
                     roundWinnerIds: winners.map(w => w.id),
                 });
-            } else {
-                // All active players passed with 0 score, deal new cards and continue round
+            } else { // Case 2: Everyone passed with 0 score, deal new cards and continue round.
                 let newDeck = game.deck;
                 players.forEach(p => {
                     const playerRef = doc(db, 'games', gameId, 'players', p.id);
@@ -233,25 +234,23 @@ async function advanceTurn(gameId: string, committingPlayerId?: string) {
                 transaction.update(gameRef, { 
                     passCount: 0,
                     deck: newDeck,
-                    // The turn stays with the current player, who will get to go again with a new card.
                     currentPlayerId: game.currentPlayerId 
                 });
             }
-        } else { 
+        } else { // Case 3: At least one player is still active, advance to the next one.
             const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
             let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
             let nextPlayerId = game.players[nextPlayerIndex];
             
             let nextPlayer = players.find(p => p.id === nextPlayerId);
             
-            // This loop finds the next player who hasn't passed
+            // Find the next player who hasn't passed
             while(nextPlayer?.passed) {
                 nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
                 nextPlayerId = game.players[nextPlayerIndex];
                 nextPlayer = players.find(p => p.id === nextPlayerId);
             }
             
-            // nextPlayer is now the correct next active player
             if (nextPlayer) {
               const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
               const newHand = [...nextPlayer.hand];
@@ -298,8 +297,6 @@ export const submitEquation = ai.defineFlow({ name: 'submitEquation', inputSchem
 export const passTurn = ai.defineFlow({ name: 'passTurn', inputSchema: PlayerActionInputSchema }, async ({ gameId, playerId }) => {
     await runTransaction(db, async (transaction) => {
         const playerRef = doc(db, 'games', gameId, 'players', playerId);
-        const gameRef = doc(db, 'games', gameId);
-
         transaction.update(playerRef, { passed: true, equation: [], finalResult: 0, roundScore: 0 });
     });
     await advanceTurn(gameId, playerId);
