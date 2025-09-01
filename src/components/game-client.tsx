@@ -356,7 +356,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
           <CardContent className="p-0 grid gap-4" style={{gridTemplateColumns: `repeat(${players.length}, minmax(0, 1fr))`}}>
               {players.map(p => (
                 <div key={p.id} className={cn("flex items-center gap-2 text-lg font-bold p-2 rounded-md", p.id === currentPlayer?.id && "bg-primary/20")}>
-                    <User /> {p.name.split(' ')[0]}: <span className="text-primary">{p.totalScore}</span>
+                    <User /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}: <span className="text-primary">{p.totalScore}</span>
                 </div>
               ))}
           </CardContent>
