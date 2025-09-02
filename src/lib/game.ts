@@ -163,15 +163,30 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
   const cardsUsedIds = new Set(cardsUsed.map(c => c.id));
   const updatedDeck = deck.filter(c => !cardsUsedIds.has(c.id));
 
+  if (isNaN(target)) {
+    return generateEasyTarget(deck, mode);
+  }
+
   return { target, cardsUsed, updatedDeck };
 }
 
 
 export function generateTarget(deck: Card[], mode: GameMode, playerCount: number): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+  let result;
   if (mode === 'pro' || mode === 'special') {
-    return generateProTarget(deck, mode);
+    result = generateProTarget(deck, mode);
+  } else {
+    result = generateEasyTarget(deck, mode);
   }
-  return generateEasyTarget(deck, mode);
+
+  if (isNaN(result.target)) {
+    console.error("[generateTarget] Fallback: Target was NaN, generating easy target instead.");
+    const fallbackResult = generateEasyTarget(deck, mode);
+    // If even the easy target fails (highly unlikely), default to a safe value.
+    return isNaN(fallbackResult.target) ? { ...fallbackResult, target: 10 } : fallbackResult;
+  }
+  
+  return result;
 }
 
 export function evaluateEquation(equation: EquationTerm[], mode: GameMode): number | { error: string } {
