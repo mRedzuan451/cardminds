@@ -233,7 +233,7 @@ async function advanceTurn(gameId: string) {
         
         const playersQuery = query(collection(db, 'games', gameId, 'players'));
         const playerDocsSnap = await getDocs(playersQuery);
-        let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
 
         // ========== LOGIC PHASE ==========
         
@@ -643,6 +643,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                     targetNumber: newTargetNumber,
                     deck: newDeck
                 });
+                turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
         }
@@ -667,3 +668,4 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
