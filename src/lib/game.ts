@@ -47,10 +47,15 @@ export function createDeck(playerCount: number, mode: GameMode = 'easy'): Card[]
 
   if (mode === 'special') {
     let specialCardMultiplier = 2; // Base for 1-3 players
-    if (playerCount >= 4 && playerCount < 8) specialCardMultiplier = 4;
+    if (playerCount >= 4 && playerCount <= 7) specialCardMultiplier = 4;
     if (playerCount === 8) specialCardMultiplier = 8;
     
-    for (let i = 0; i < specialCardMultiplier / 2; i++) { // Each loop adds 2 of each
+    // Each loop adds 2 of each special card.
+    // The multiplier is divided by 2 because the loop adds a pair of cards each time.
+    // If playerCount is 8, deckCount is 2, so we need to double the special cards as well.
+    const loopCount = (specialCardMultiplier / 2) * deckCount;
+
+    for (let i = 0; i < loopCount; i++) { 
         for (const rank of SPECIAL_RANKS) {
             deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
         }
@@ -58,6 +63,7 @@ export function createDeck(playerCount: number, mode: GameMode = 'easy'): Card[]
   }
   return deck;
 }
+
 
 export function shuffleDeck(deck: Card[]): Card[] {
   const shuffled = [...deck];
