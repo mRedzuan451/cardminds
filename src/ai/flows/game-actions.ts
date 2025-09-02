@@ -556,8 +556,8 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
-            // Don't count the shuffle card itself when determining how many to draw.
-            const cardsToDraw = player.hand.length - 1; 
+            // Discard hand and draw the same number of cards
+            const cardsToDraw = player.hand.length;
             const newCardsForHand = newDeck.splice(0, cardsToDraw);
             
             // Update player's hand, but DO NOT end their turn.
