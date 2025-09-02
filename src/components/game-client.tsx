@@ -525,6 +525,16 @@ const renderDiscardUI = () => {
       {renderSpecialActionUI()}
       {renderDiscardUI()}
 
+      {/* Action Buttons - Top on mobile, right on desktop */}
+      <div className="w-full md:hidden flex flex-col md:flex-row gap-2">
+        <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
+          <RefreshCw className="mr-2 h-5 w-5"/> New Game
+        </Button>
+        <Button onClick={handleBackToMenu} size="lg" className="shadow-lg" variant="outline">
+          <ArrowLeft className="mr-2 h-5 w-5"/> Menu
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         {/* Column 1: Scoreboard */}
         <Card className="text-center p-4 shadow-lg w-full md:col-span-1">
@@ -564,8 +574,8 @@ const renderDiscardUI = () => {
             </Card>
         </div>
 
-        {/* Column 3: Actions */}
-        <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
+        {/* Column 3: Actions - Hidden on mobile */}
+        <div className="w-full md:col-span-1 hidden md:flex flex-col items-center justify-center gap-4">
             <div className="flex flex-col md:flex-row gap-2 w-full">
               <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
                 <RefreshCw className="mr-2 h-5 w-5"/> New Game
