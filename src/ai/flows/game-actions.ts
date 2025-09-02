@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, updateDoc, runTransaction, arrayUnion, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase';
 import { Game, Player, GameState, GameMode, Card } from '@/lib/types';
-import { createDeck, shuffleDeck, generateTarget, calculateScore, evaluateEquation } from '@/lib/game';
+import { createDeck, shuffleDeck, generateTarget, calculateScore, evaluateEquation, getCardValues } from '@/lib/game';
 
 const db = getFirestore(firebaseApp);
 
