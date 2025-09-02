@@ -77,13 +77,16 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
     while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
         currentDeck = shuffleDeck(createDeck(1, mode));
         
-        const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+        const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
+        if (numIndex1 === -1) continue;
         let numCard1 = currentDeck.splice(numIndex1, 1)[0];
         
         const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/' && c.suit !== 'Special');
+        if (opIndex === -1) continue;
         const opCard = currentDeck.splice(opIndex, 1)[0];
 
-        const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+        const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
+        if (numIndex2 === -1) continue;
         let numCard2 = currentDeck.splice(numIndex2, 1)[0];
         
         let term1 = CARD_VALUES[numCard1.rank] as number;
@@ -116,6 +119,8 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
 function generateProTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   let currentDeck = [...deck];
   const CARD_VALUES = getCardValues('pro');
+  
+  // Filter for number cards, but don't remove special cards from the main deck yet
   const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
   
   if (numberCards.length < 2) {
@@ -124,8 +129,7 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
   }
 
   const card1Index = Math.floor(Math.random() * numberCards.length);
-  const card1 = numberCards[card1Index];
-  numberCards.splice(card1Index, 1);
+  const card1 = numberCards.splice(card1Index, 1)[0]; // Use splice to avoid picking same card
   
   const card2Index = Math.floor(Math.random() * numberCards.length);
   const card2 = numberCards[card2Index];
@@ -136,6 +140,7 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
   const target = parseInt(`${val1}${val2}`, 10);
   const cardsUsed = [card1, card2];
   
+  // Now, create the final updated deck by removing only the cards used for the target
   const updatedDeck = deck.filter(c => !cardsUsed.some(used => used.id === c.id));
 
   return { target, cardsUsed, updatedDeck };
