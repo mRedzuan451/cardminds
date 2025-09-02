@@ -399,12 +399,12 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
             {localPlayer.id === game.creatorId && (
               <div className="space-y-4">
                 <Label className="text-xl">Game Mode</Label>
-                <div className="flex flex-col md:flex-row gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Button
                     onClick={() => handleSetGameMode('easy')}
                     size="lg"
                     variant={game.gameMode === 'easy' ? 'default' : 'outline'}
-                    className="h-24 text-2xl w-full"
+                    className="h-24 text-2xl"
                   >
                     <Baby className="mr-4 h-8 w-8" />
                     Easy
@@ -413,7 +413,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     onClick={() => handleSetGameMode('pro')}
                     size="lg"
                     variant={game.gameMode === 'pro' ? 'default' : 'outline'}
-                    className="h-24 text-2xl w-full border-destructive text-destructive data-[variant=default]:bg-destructive data-[variant=default]:text-destructive-foreground"
+                    className="h-24 text-2xl border-destructive text-destructive data-[variant=default]:bg-destructive data-[variant=default]:text-destructive-foreground"
                   >
                     <BrainCircuit className="mr-4 h-8 w-8" />
                     Pro
@@ -422,7 +422,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     onClick={() => handleSetGameMode('special')}
                     size="lg"
                     variant={game.gameMode === 'special' ? 'default' : 'outline'}
-                    className="h-24 text-2xl w-full border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
+                    className="h-24 text-2xl border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
                   >
                     <Sparkles className="mr-4 h-8 w-8" />
                     Special
