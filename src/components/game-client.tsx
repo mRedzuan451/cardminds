@@ -162,7 +162,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const handleSubmitEquation = async () => {
     if (!isMyTurn || !localPlayer || !game) return;
 
-    if (game.gameMode === 'easy' || game.gameMode === 'special') {
+    if (game.gameMode === 'easy') {
       if (equation.length < 3) {
         toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
         return;
@@ -536,7 +536,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
             <div className="flex items-center justify-between gap-2 mt-3">
-              <div className={cn("grid grid-cols-2 gap-2", game.gameMode !== 'pro' && "hidden")}>
+              <div className={cn("grid grid-cols-2 gap-2", (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden")}>
                 <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
                 <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
