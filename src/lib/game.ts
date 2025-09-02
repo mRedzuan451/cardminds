@@ -32,36 +32,40 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
 }
 
 export function createDeck(playerCount: number, mode: GameMode = 'easy'): Card[] {
-  let deck: Card[] = [];
-  let cardIdCounter = 0;
-  
-  const deckCount = (mode === 'special' && playerCount === 8) ? 2 : 1;
+    let deck: Card[] = [];
+    let cardIdCounter = 0;
 
-  for (let i = 0; i < deckCount; i++) {
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        deck.push({ id: `card-${cardIdCounter++}`, suit, rank });
-      }
-    }
-  }
+    // Determine the number of standard 52-card decks
+    const standardDeckCount = (mode === 'special' && playerCount === 8) ? 2 : 1;
 
-  if (mode === 'special') {
-    let specialCardMultiplier = 2; // Base for 1-3 players
-    if (playerCount >= 4 && playerCount <= 7) specialCardMultiplier = 4;
-    if (playerCount === 8) specialCardMultiplier = 8;
-    
-    // Each loop adds 2 of each special card.
-    // The multiplier is divided by 2 because the loop adds a pair of cards each time.
-    // If playerCount is 8, deckCount is 2, so we need to double the special cards as well.
-    const loopCount = (specialCardMultiplier / 2) * deckCount;
-
-    for (let i = 0; i < loopCount; i++) { 
-        for (const rank of SPECIAL_RANKS) {
-            deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
+    // Create the standard card decks
+    for (let i = 0; i < standardDeckCount; i++) {
+        for (const suit of SUITS) {
+            for (const rank of RANKS) {
+                deck.push({ id: `card-${cardIdCounter++}`, suit, rank });
+            }
         }
     }
-  }
-  return deck;
+
+    // Add special cards for "Special" mode
+    if (mode === 'special') {
+        let setsOfSpecialCards = 1; // Base for 1-3 players (2 of each card)
+        if (playerCount >= 4 && playerCount <= 7) {
+            setsOfSpecialCards = 2; // For 4-7 players (4 of each card)
+        } else if (playerCount === 8) {
+            setsOfSpecialCards = 4; // For 8 players (8 of each card)
+        }
+        
+        for (let i = 0; i < setsOfSpecialCards; i++) {
+            // Add a set of 2 of each special card type
+            for (const rank of SPECIAL_RANKS) {
+                deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
+                deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
+            }
+        }
+    }
+
+    return deck;
 }
 
 
