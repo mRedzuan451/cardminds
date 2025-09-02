@@ -22,7 +22,7 @@ export const EASY_CARD_VALUES: Record<Rank, EquationTerm> = {
 };
 
 export const SPECIAL_CARD_VALUES: Record<Rank, EquationTerm> = {
-    ...EASY_CARD_VALUES
+    ...PRO_CARD_VALUES // Use Pro rules for K = '/'
 };
 
 
@@ -141,7 +141,7 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
 
   let terms = [...equation];
   
-  if (mode === 'pro') {
+  if (mode === 'pro' || mode === 'special') {
     const newTerms: EquationTerm[] = [];
     for (let i = 0; i < terms.length; i++) {
         newTerms.push(terms[i]);
