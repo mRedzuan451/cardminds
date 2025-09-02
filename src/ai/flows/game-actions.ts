@@ -153,7 +153,11 @@ export const joinGame = ai.defineFlow({ name: 'joinGame', inputSchema: JoinGameI
 
 export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: SetGameModeInputSchema}, async ({ gameId, mode }) => {
     const gameRef = doc(db, 'games', gameId);
-    await updateDoc(gameRef, { gameMode: mode });
+    if (mode === 'special') {
+        await updateDoc(gameRef, { gameMode: mode, totalRounds: 99, targetScore: 3000 });
+    } else {
+        await updateDoc(gameRef, { gameMode: mode, totalRounds: 3, targetScore: 0 });
+    }
     console.log(`[setGameMode] Game mode for ${gameId} set to ${mode}`);
 });
 
@@ -202,7 +206,6 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
         }
     }
 
-
     transaction.update(gameRef, {
         gameState: 'playerTurn',
         deck: freshDeck,
@@ -237,23 +240,36 @@ async function advanceTurn(gameId: string) {
 
         if (allPlayersHaveActed) {
             // End of the round. Tally scores.
+            console.log(`[advanceTurn] Round over for game ${gameId}.`);
+            
+            // Update total scores
+            players.forEach(p => {
+                const newTotalScore = p.totalScore + p.roundScore;
+                const playerRef = doc(db, 'games', gameId, 'players', p.id);
+                transaction.update(playerRef, { totalScore: newTotalScore });
+                // Update player object in local list for gameOver check
+                p.totalScore = newTotalScore;
+            });
+
+            // Check for game over condition
+            if (game.gameMode === 'special' && game.targetScore) {
+                const winner = players.find(p => p.totalScore >= game.targetScore!);
+                if (winner) {
+                    transaction.update(gameRef, { gameState: 'gameOver' });
+                    console.log(`[advanceTurn] Game over! ${winner.name} reached the target score.`);
+                    return; // End transaction
+                }
+            }
+            
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
-            console.log(`[advanceTurn] Round over. Highest score: ${highestScore}. Winners:`, winners.map(w => w.name));
-            
-            // It's possible for everyone to pass and score 0, which is a draw with no points.
             const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
-
-            players.forEach(p => {
-                const playerRef = doc(db, 'games', gameId, 'players', p.id);
-                transaction.update(playerRef, { totalScore: p.totalScore + p.roundScore });
-            });
 
             transaction.update(gameRef, {
                 gameState: 'roundOver',
                 roundWinnerIds,
             });
-            console.log(`[advanceTurn] Game state set to 'roundOver'.`);
+            console.log(`[advanceTurn] Game state set to 'roundOver'. Winners:`, winners.map(w => w.name));
             return; // End the transaction, round is over.
         }
 
@@ -358,8 +374,8 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     if (!gameDoc.exists()) throw new Error("Game not found");
     let game = gameDoc.data() as Game;
     
-    if (game.currentRound >= game.totalRounds) {
-      console.log(`[nextRound] Game over. Setting state to 'gameOver'.`);
+    if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
+      console.log(`[nextRound] Game over by rounds. Setting state to 'gameOver'.`);
       transaction.update(gameRef, { gameState: 'gameOver' });
       return;
     }
@@ -444,7 +460,8 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
       targetCards: [],
       currentPlayerId: oldGameData.creatorId,
       currentRound: 1,
-      totalRounds: 3,
+      totalRounds: oldGameData.totalRounds,
+      targetScore: oldGameData.targetScore
     };
     
     const batch = writeBatch(db);
@@ -513,13 +530,25 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             const allPlayersHaveActed = players.every(p => p.passed);
 
             if (allPlayersHaveActed) {
+                // Round Over Logic
+                players.forEach(p => {
+                    const newTotalScore = p.totalScore + p.roundScore;
+                    const pRef = doc(db, 'games', gameId, 'players', p.id);
+                    transaction.update(pRef, { totalScore: newTotalScore });
+                    p.totalScore = newTotalScore;
+                });
+    
+                if (game.gameMode === 'special' && game.targetScore) {
+                    const winner = players.find(p => p.totalScore >= game.targetScore!);
+                    if (winner) {
+                        transaction.update(gameRef, { gameState: 'gameOver' });
+                        return;
+                    }
+                }
+
                 const highestScore = Math.max(...players.map(p => p.roundScore));
                 const winners = players.filter(p => p.roundScore === highestScore);
                 const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
-                players.forEach(p => {
-                    const pRef = doc(db, 'games', gameId, 'players', p.id);
-                    transaction.update(pRef, { totalScore: p.totalScore + p.roundScore });
-                });
                 transaction.update(gameRef, { gameState: 'roundOver', roundWinnerIds });
             } else {
                 const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);

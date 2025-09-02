@@ -451,7 +451,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         {/* Column 1: Scoreboard */}
         <Card className="text-center p-4 shadow-lg w-full md:col-span-1">
           <CardHeader className="p-0 mb-2">
-            <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {game.currentRound}/{game.totalRounds})</CardTitle>
+            <CardTitle className="text-lg text-muted-foreground font-headline">
+              {game.gameMode === 'special' ? `Score to Win: ${game.targetScore}` : `Scoreboard (Round ${game.currentRound}/${game.totalRounds})`}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0 grid gap-2">
               {players.map(p => (

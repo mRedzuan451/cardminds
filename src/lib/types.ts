@@ -39,6 +39,7 @@ export interface Game {
     currentPlayerId: string;
     currentRound: number;
     totalRounds: number;
+    targetScore?: number;
     roundWinnerIds?: string[];
     nextGameId?: string;
     specialAction?: {
