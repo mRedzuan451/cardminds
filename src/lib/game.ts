@@ -22,25 +22,27 @@ export const EASY_CARD_VALUES: Record<Rank, EquationTerm> = {
 };
 
 export const SPECIAL_CARD_VALUES: Record<Rank, EquationTerm> = {
-    ...PRO_CARD_VALUES, // Use Pro rules for K = '/'
+    ...PRO_CARD_VALUES,
 };
 
 
 export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
-    if (mode === 'pro') return PRO_CARD_VALUES;
-    if (mode === 'special') return SPECIAL_CARD_VALUES;
+    if (mode === 'pro' || mode === 'special') return PRO_CARD_VALUES;
     return EASY_CARD_VALUES;
 }
 
 export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount = 1): Card[] {
   let deck: Card[] = [];
+  let cardIdCounter = 0;
+
   for (let i = 0; i < deckCount; i++) {
     for (const suit of SUITS) {
       for (const rank of RANKS) {
-        deck.push({ suit, rank });
+        deck.push({ id: `card-${cardIdCounter++}`, suit, rank });
       }
     }
   }
+
   if (mode === 'special') {
     let specialCardMultiplier = 1;
     if (playerCount >= 4 && playerCount < 8) specialCardMultiplier = 2;
@@ -48,7 +50,7 @@ export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount =
     
     for (let i = 0; i < specialCardMultiplier; i++) {
         for (const rank of SPECIAL_RANKS) {
-            deck.push({ suit: 'Special', rank });
+            deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
         }
     }
   }
@@ -127,7 +129,7 @@ function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], u
   const target = parseInt(`${val1}${val2}`, 10);
   const cardsUsed = [card1, card2];
   
-  const updatedDeck = deck.filter(c => !cardsUsed.some(used => used.rank === c.rank && used.suit === c.suit));
+  const updatedDeck = deck.filter(c => !cardsUsed.some(used => used.id === c.id));
 
   return { target, cardsUsed, updatedDeck };
 }
@@ -148,10 +150,11 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
   if (mode === 'pro' || mode === 'special') {
     const newTerms: EquationTerm[] = [];
     for (let i = 0; i < terms.length; i++) {
-        newTerms.push(terms[i]);
         const currentTerm = terms[i];
         const nextTerm = terms[i + 1];
-        
+
+        newTerms.push(currentTerm);
+
         if (typeof currentTerm === 'number' && nextTerm === '(') {
             newTerms.push('*');
         } else if (currentTerm === ')' && typeof nextTerm === 'number') {

@@ -284,7 +284,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     await gameActions.resolveSpecialCard({
         gameId,
         playerId: localPlayer.id,
-        card: { suit: 'Special', rank: game.specialAction.cardRank },
+        card: { suit: 'Special', rank: game.specialAction.cardRank, id: '' }, // id can be dummy
         target
     });
     await gameActions.endSpecialAction({ gameId });
@@ -306,7 +306,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                         <p>Select a card from your hand to clone:</p>
                         <div className="flex flex-wrap gap-2 mt-2">
                             {activeHand.map((card, index) => (
-                                <GameCard key={`${card.rank}-${index}`} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
+                                <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
                             ))}
                         </div>
                     </div>
@@ -326,7 +326,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                         <p>Select a target card to re-roll:</p>
                         <div className="flex flex-wrap gap-2 mt-2">
                             {game.targetCards.map((card, index) => (
-                                <GameCard key={`target-${index}`} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(index)} />
+                                <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(index)} />
                             ))}
                         </div>
                     </div>
@@ -511,7 +511,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
               {game.targetCards.map((card, index) => (
-                <GameCard key={index} card={card} mode={game.gameMode} />
+                <GameCard key={card.id} card={card} mode={game.gameMode} />
               ))}
           </div>
            {targetEquation && (
@@ -633,7 +633,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
             </h2>
             <div className="flex flex-wrap justify-center gap-4">
               {activeHand.map((card, index) => (
-                <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
+                <div key={card.id} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
                   <GameCard
                     card={card}
                     mode={game.gameMode}

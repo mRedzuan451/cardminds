@@ -26,6 +26,7 @@ function generateShortId(length = 6) {
 
 // Schemas
 const CardSchema = z.object({
+    id: z.string(),
     suit: z.string(),
     rank: z.string(),
 });
@@ -46,10 +47,7 @@ const PlayerActionInputSchema = z.object({
 const SpecialActionInputSchema = z.object({
     gameId: z.string(),
     playerId: z.string(),
-    card: z.object({
-        suit: z.string(),
-        rank: z.string(),
-    }),
+    card: CardSchema,
     target: z.optional(z.any()),
 });
 
@@ -166,7 +164,7 @@ export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: Set
     console.log(`[setGameMode] Game mode for ${gameId} set to ${mode}`);
 });
 
-export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId }) => {
+export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId, numberOfPlayers }) => {
   await runTransaction(db, async (transaction) => {
     console.log(`[startGame] Attempting to start game ${gameId}`);
     // Read phase
@@ -185,7 +183,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     // Write phase
     const deckCount = playerCount > 4 ? 2 : 1;
     let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
+    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
     
@@ -355,7 +353,7 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
 
       // Remove used cards from hand
       const newHand = player.hand.filter(handCard => 
-        !cardsUsed.some(usedCard => usedCard.rank === handCard.rank && usedCard.suit === handCard.suit)
+        !cardsUsed.some(usedCard => usedCard.id === handCard.id)
       );
 
       transaction.update(playerRef, {
@@ -406,7 +404,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     // Write phase
     const deckCount = playerCount > 4 ? 2 : 1;
     let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
+    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[nextRound] New target: ${target}.`);
     
@@ -547,33 +545,30 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         const game = gameDoc.data() as Game;
         const player = playerDoc.data() as Player;
 
-        // Remove card from hand
-        const cardIndex = player.hand.findIndex(c => c.rank === card.rank && c.suit === card.suit);
+        // Find and remove card from hand
+        const cardIndex = player.hand.findIndex(c => c.id === card.id);
         if (cardIndex === -1) throw new Error("Card not in hand");
         const newHand = [...player.hand];
         newHand.splice(cardIndex, 1);
         
-
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
-            // Discard hand and draw the same number of cards
-            const handSize = player.hand.length;
+            const handToDiscard = [...newHand]; // The hand without the SH card
+            const handSize = player.hand.length; // Original hand size
             
-            // Add current hand (minus the shuffle card) back to the deck
-            newDeck.push(...newHand);
+            newDeck.push(...handToDiscard);
             newDeck = shuffleDeck(newDeck);
             
-            const newCardsForHand = newDeck.splice(0, handSize); // Draw same number of cards as original hand
+            const newCardsForHand = newDeck.splice(0, handSize);
             
-            // Update player's hand, but DO NOT end their turn.
             transaction.update(playerRef, { hand: newCardsForHand });
             transaction.update(gameRef, { deck: newDeck });
             // The turn does not advance here. The player can now make a move.
             
         } else {
-             // For other cards, set game state to get more input
+             // For other cards, remove the card and set game state to get more input
              transaction.update(playerRef, { hand: newHand });
              transaction.update(gameRef, { 
                 gameState: 'specialAction',
@@ -600,7 +595,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const playerDoc = await transaction.get(playerRef);
                 if (!playerDoc.exists()) throw new Error("Player not found");
                 const player = playerDoc.data() as Player;
-                const clonedCard = target as Card;
+                const clonedCard = { ...(target as Card), id: `cloned-${Date.now()}` };
                 const newHand = [...player.hand, clonedCard];
                 transaction.update(playerRef, { hand: newHand });
                 break;
@@ -629,7 +624,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 newTargetCards[targetCardIndex] = newCard;
 
                 // Re-evaluate the target number based on the new cards
-                const cardValues = newTargetCards.map(c => getCardValues(game.gameMode)[c.rank]);
+                const cardValues = newTargetCards.map(c => getCardValues(game.gameMode)[c.rank] as number);
                 const newTargetNumber = parseInt(cardValues.join(''), 10);
                 
                 transaction.update(gameRef, {

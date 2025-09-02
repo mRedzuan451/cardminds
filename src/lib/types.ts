@@ -3,6 +3,7 @@ export type Suit = 'Spades' | 'Hearts' | 'Diamonds' | 'Clubs' | 'Special';
 export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'CL' | 'SB' | 'SH' | 'DE';
 
 export interface Card {
+  id: string;
   suit: Suit;
   rank: Rank;
 }
