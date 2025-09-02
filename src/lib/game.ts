@@ -22,7 +22,7 @@ export const EASY_CARD_VALUES: Record<Rank, EquationTerm> = {
 };
 
 export const SPECIAL_CARD_VALUES: Record<Rank, EquationTerm> = {
-    ...PRO_CARD_VALUES // Use Pro rules for K = '/'
+    ...PRO_CARD_VALUES, // Use Pro rules for K = '/'
 };
 
 
@@ -43,12 +43,11 @@ export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount =
   }
   if (mode === 'special') {
     let specialCardMultiplier = 1;
-    if (playerCount >= 4) specialCardMultiplier = 2;
+    if (playerCount >= 4 && playerCount < 8) specialCardMultiplier = 2;
     if (playerCount === 8) specialCardMultiplier = 4;
     
     for (let i = 0; i < specialCardMultiplier; i++) {
         for (const rank of SPECIAL_RANKS) {
-            deck.push({ suit: 'Special', rank });
             deck.push({ suit: 'Special', rank });
         }
     }
@@ -134,7 +133,7 @@ function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], u
 }
 
 
-export function generateTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+export function generateTarget(deck: Card[], mode: GameMode, playerCount: number): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   if (mode === 'pro' || mode === 'special') {
     return generateProTarget(deck);
   }
@@ -152,9 +151,12 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
         newTerms.push(terms[i]);
         const currentTerm = terms[i];
         const nextTerm = terms[i + 1];
-        if (currentTerm === ')' && typeof nextTerm === 'number') {
+        
+        if (typeof currentTerm === 'number' && nextTerm === '(') {
             newTerms.push('*');
-        } else if (typeof currentTerm === 'number' && nextTerm === '(') {
+        } else if (currentTerm === ')' && typeof nextTerm === 'number') {
+            newTerms.push('*');
+        } else if (currentTerm === ')' && nextTerm === '(') {
             newTerms.push('*');
         }
     }
