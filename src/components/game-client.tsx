@@ -183,6 +183,8 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
         return;
     }
+
+    const cardsUsed = Array.from(usedCardIndices).map(index => activeHand[index]);
     
     try {
       await gameActions.playerAction({
@@ -190,7 +192,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         playerId: localPlayer.id,
         action: 'submit',
         equation,
-        cardsUsedCount: usedCardIndices.size,
+        cardsUsed: cardsUsed,
       });
       handleClearEquation();
     } catch (e: any) {

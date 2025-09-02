@@ -22,6 +22,7 @@ export interface Player {
     passed: boolean;
     finalResult: number;
     equation: EquationTerm[];
+    cardsUsed?: Card[];
 }
 
 export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction';

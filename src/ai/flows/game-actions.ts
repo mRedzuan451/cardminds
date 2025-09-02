@@ -24,6 +24,10 @@ function generateShortId(length = 6) {
 }
 
 // Schemas
+const CardSchema = z.object({
+    suit: z.string(),
+    rank: z.string(),
+});
 const CreateGameInputSchema = z.object({ creatorName: z.string() });
 const GameIdInputSchema = z.object({ gameId: z.string() });
 const JoinGameInputSchema = z.object({ gameId: z.string(), playerName: z.string() });
@@ -35,7 +39,7 @@ const PlayerActionInputSchema = z.object({
   playerId: z.string(),
   action: z.enum(['submit', 'pass']),
   equation: z.optional(z.array(z.union([z.string(), z.number()]))),
-  cardsUsedCount: z.optional(z.number()),
+  cardsUsed: z.optional(z.array(CardSchema)),
 });
 
 const SpecialActionInputSchema = z.object({
@@ -319,8 +323,11 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     const playerRef = doc(db, 'games', gameId, 'players', playerId);
     
     const gameDoc = await transaction.get(gameRef);
-    if (!gameDoc.exists()) throw new Error("Game not found");
+    const playerDoc = await transaction.get(playerRef);
+
+    if (!gameDoc.exists() || !playerDoc.exists()) throw new Error("Game or player not found");
     const game = gameDoc.data() as Game;
+    const player = playerDoc.data() as Player;
 
     if (game.currentPlayerId !== playerId) {
       console.warn(`[playerAction] Ignoring action from player ${playerId} because it's not their turn.`);
@@ -328,9 +335,9 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     }
 
     if (action === 'submit') {
-      const { equation, cardsUsedCount } = input;
-      if (equation === undefined || cardsUsedCount === undefined) {
-        throw new Error("Submit action requires equation and cardsUsedCount.");
+      const { equation, cardsUsed } = input;
+      if (equation === undefined || cardsUsed === undefined) {
+        throw new Error("Submit action requires equation and cardsUsed.");
       }
       console.log(`[playerAction] Player ${playerId} submitted equation:`, equation);
 
@@ -341,12 +348,20 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
       }
       console.log(`[playerAction] Equation result: ${result}`);
       
-      const newScore = calculateScore(result as number, game.targetNumber, cardsUsedCount);
+      const newScore = calculateScore(result as number, game.targetNumber, cardsUsed.length);
       console.log(`[playerAction] Calculated score for ${playerId}: ${newScore}`);
+
+      // Remove used cards from hand
+      const newHand = player.hand.filter(handCard => 
+        !cardsUsed.some(usedCard => usedCard.rank === handCard.rank && usedCard.suit === handCard.suit)
+      );
+
       transaction.update(playerRef, {
         roundScore: newScore,
         finalResult: result,
         equation: equation,
+        cardsUsed: cardsUsed,
+        hand: newHand,
         passed: true, // Submitting also means you are done for the turn cycle
       });
 
@@ -355,6 +370,7 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         transaction.update(playerRef, {
           passed: true, 
           equation: [], 
+          cardsUsed: [],
           finalResult: 0, 
           roundScore: 0 
         });
@@ -399,7 +415,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
         const hand = freshDeck.splice(0, 5);
         dealtHands[p.id] = hand;
         const playerRef = doc(db, 'games', gameId, 'players', p.id);
-        transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
+        transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [], cardsUsed: [] });
     });
 
     // Deal starting card to first player
