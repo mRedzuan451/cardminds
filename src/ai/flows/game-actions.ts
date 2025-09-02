@@ -179,11 +179,12 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     const playersQuery = query(collection(db, 'games', gameId, 'players'));
     const playerDocsSnap = await getDocs(playersQuery);
     const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
-    console.log(`[startGame] Found ${players.length} players.`);
+    const playerCount = players.length;
+    console.log(`[startGame] Found ${playerCount} players.`);
 
     // Write phase
-    const deckCount = players.length > 4 ? 2 : 1;
-    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode));
+    const deckCount = playerCount > 4 ? 2 : 1;
+    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
     freshDeck = updatedDeck;
     console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
@@ -400,10 +401,11 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     const playersQuery = query(collection(db, 'games', gameId, 'players'));
     const playerDocsSnap = await getDocs(playersQuery);
     const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+    const playerCount = players.length;
 
     // Write phase
-    const deckCount = players.length > 4 ? 2 : 1;
-    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode));
+    const deckCount = playerCount > 4 ? 2 : 1;
+    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode);
     freshDeck = updatedDeck;
     console.log(`[nextRound] New target: ${target}.`);
@@ -557,8 +559,13 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
             // Discard hand and draw the same number of cards
-            const cardsToDraw = player.hand.length;
-            const newCardsForHand = newDeck.splice(0, cardsToDraw);
+            const handSize = player.hand.length;
+            
+            // Add current hand (minus the shuffle card) back to the deck
+            newDeck.push(...newHand);
+            newDeck = shuffleDeck(newDeck);
+            
+            const newCardsForHand = newDeck.splice(0, handSize); // Draw same number of cards as original hand
             
             // Update player's hand, but DO NOT end their turn.
             transaction.update(playerRef, { hand: newCardsForHand });

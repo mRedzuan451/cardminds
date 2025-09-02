@@ -32,7 +32,7 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
     return EASY_CARD_VALUES;
 }
 
-export function createDeck(deckCount = 1, mode: GameMode = 'easy'): Card[] {
+export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount = 1): Card[] {
   let deck: Card[] = [];
   for (let i = 0; i < deckCount; i++) {
     for (const suit of SUITS) {
@@ -42,10 +42,15 @@ export function createDeck(deckCount = 1, mode: GameMode = 'easy'): Card[] {
     }
   }
   if (mode === 'special') {
-    for (const rank of SPECIAL_RANKS) {
-        // Add 2 of each special card
-        deck.push({ suit: 'Special', rank });
-        deck.push({ suit: 'Special', rank });
+    let specialCardMultiplier = 1;
+    if (playerCount >= 4) specialCardMultiplier = 2;
+    if (playerCount === 8) specialCardMultiplier = 4;
+    
+    for (let i = 0; i < specialCardMultiplier; i++) {
+        for (const rank of SPECIAL_RANKS) {
+            deck.push({ suit: 'Special', rank });
+            deck.push({ suit: 'Special', rank });
+        }
     }
   }
   return deck;
