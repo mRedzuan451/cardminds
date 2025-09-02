@@ -666,16 +666,29 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 break;
             }
             case 'SB': { // Sabotage Card
+                const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
                 const targetPlayerId = target as string;
                 const targetPlayerRef = doc(db, 'games', gameId, 'players', targetPlayerId);
-                const targetPlayerDoc = await transaction.get(targetPlayerRef);
-                if (!targetPlayerDoc.exists()) throw new Error("Target player not found");
+
+                const [actingPlayerDoc, targetPlayerDoc] = await Promise.all([
+                    transaction.get(actingPlayerRef),
+                    transaction.get(targetPlayerRef)
+                ]);
+
+                if (!actingPlayerDoc.exists() || !targetPlayerDoc.exists()) throw new Error("Player not found");
+                
+                const actingPlayer = actingPlayerDoc.data() as Player;
                 const targetPlayer = targetPlayerDoc.data() as Player;
-                const hand = targetPlayer.hand;
-                if(hand.length > 0) {
-                    const cardToRemoveIndex = Math.floor(Math.random() * hand.length);
-                    hand.splice(cardToRemoveIndex, 1);
-                    transaction.update(targetPlayerRef, { hand: hand });
+                const targetHand = [...targetPlayer.hand];
+
+                if (targetHand.length > 0) {
+                    const cardToRemoveIndex = Math.floor(Math.random() * targetHand.length);
+                    const stolenCard = targetHand.splice(cardToRemoveIndex, 1)[0];
+                    
+                    const newActingPlayerHand = [...actingPlayer.hand, stolenCard];
+
+                    transaction.update(targetPlayerRef, { hand: targetHand });
+                    transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
                 }
                 break;
             }
