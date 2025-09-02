@@ -174,20 +174,17 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         return;
     }
     
-    if (typeof result === 'number') {
-      try {
-        await gameActions.playerAction({
-          gameId,
-          playerId: localPlayer.id,
-          action: 'submit',
-          equation,
-          result,
-          cardsUsedCount: usedCardIndices.size,
-        });
-        handleClearEquation();
-      } catch (e: any) {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
-      }
+    try {
+      await gameActions.playerAction({
+        gameId,
+        playerId: localPlayer.id,
+        action: 'submit',
+        equation,
+        cardsUsedCount: usedCardIndices.size,
+      });
+      handleClearEquation();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
   
@@ -287,7 +284,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!game || !game.roundWinnerIds || game.roundWinnerIds.length === 0 || !players) return null;
     const winners = players.filter(p => game.roundWinnerIds?.includes(p.id));
     if (winners.length > 1) {
-        return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
+        return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It&apos;s a Draw!</p>;
     }
     if (winners.length === 0) {
       return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">No winner this round!</p>;
@@ -411,7 +408,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline text-2xl">Target Combination</AlertDialogTitle>
             <AlertDialogDescription>
-              Here's how the target number was created:
+              Here&apos;s how the target number was created:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
@@ -438,7 +435,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
       {game.gameState === 'gameOver' && (
          <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
            <CardTitle className="text-5xl font-headline mb-4 flex items-center justify-center gap-4"><Trophy className="w-12 h-12 text-yellow-400" />Game Over!</CardTitle>
-           {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It's a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
+           {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It&apos;s a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
            {totalWinner.length === 1 && <p className="text-4xl font-bold my-6 text-primary">{totalWinner[0].name} is the Grand Winner!</p>}
            
            <div className="text-2xl font-bold">Final Scores</div>
