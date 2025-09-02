@@ -617,14 +617,22 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
             case 'DE': { // Destiny Card
                 const targetCardIndex = target as number;
                 let newDeck = [...game.deck];
-                if (newDeck.length === 0) throw new Error("Deck is empty, cannot use Destiny card.");
+                const CARD_VALUES = getCardValues(game.gameMode);
+
+                // Find the index of the first available number card in the deck
+                const replacementCardIndex = newDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
+                if (replacementCardIndex === -1) {
+                    throw new Error("No number cards left in the deck to use for Destiny.");
+                }
                 
-                const newCard = newDeck.shift()!;
+                // Remove the card from the deck and use it
+                const newCard = newDeck.splice(replacementCardIndex, 1)[0];
+
                 const newTargetCards = [...game.targetCards];
                 newTargetCards[targetCardIndex] = newCard;
 
                 // Re-evaluate the target number based on the new cards
-                const cardValues = newTargetCards.map(c => getCardValues(game.gameMode)[c.rank] as number);
+                const cardValues = newTargetCards.map(c => CARD_VALUES[c.rank] as number);
                 const newTargetNumber = parseInt(cardValues.join(''), 10);
                 
                 transaction.update(gameRef, {
@@ -652,5 +660,3 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
-
-    
