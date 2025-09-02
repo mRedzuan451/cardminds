@@ -31,9 +31,11 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
     return EASY_CARD_VALUES;
 }
 
-export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount = 1): Card[] {
+export function createDeck(playerCount: number, mode: GameMode = 'easy'): Card[] {
   let deck: Card[] = [];
   let cardIdCounter = 0;
+  
+  const deckCount = (mode === 'special' && playerCount === 8) ? 2 : 1;
 
   for (let i = 0; i < deckCount; i++) {
     for (const suit of SUITS) {
@@ -44,11 +46,11 @@ export function createDeck(deckCount = 1, mode: GameMode = 'easy', playerCount =
   }
 
   if (mode === 'special') {
-    let specialCardMultiplier = 1;
-    if (playerCount >= 4 && playerCount < 8) specialCardMultiplier = 2;
-    if (playerCount === 8) specialCardMultiplier = 4;
+    let specialCardMultiplier = 2; // Base for 1-3 players
+    if (playerCount >= 4 && playerCount < 8) specialCardMultiplier = 4;
+    if (playerCount === 8) specialCardMultiplier = 8;
     
-    for (let i = 0; i < specialCardMultiplier; i++) {
+    for (let i = 0; i < specialCardMultiplier / 2; i++) { // Each loop adds 2 of each
         for (const rank of SPECIAL_RANKS) {
             deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
         }
@@ -111,11 +113,16 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
     return { target: result, cardsUsed, updatedDeck: currentDeck };
 }
 
-function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+function generateProTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   let currentDeck = [...deck];
   const CARD_VALUES = getCardValues('pro');
   const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
   
+  if (numberCards.length < 2) {
+    // Not enough number cards, fall back to easy generation
+    return generateEasyTarget(deck, mode);
+  }
+
   const card1Index = Math.floor(Math.random() * numberCards.length);
   const card1 = numberCards[card1Index];
   numberCards.splice(card1Index, 1);
@@ -137,7 +144,7 @@ function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], u
 
 export function generateTarget(deck: Card[], mode: GameMode, playerCount: number): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   if (mode === 'pro' || mode === 'special') {
-    return generateProTarget(deck);
+    return generateProTarget(deck, mode);
   }
   return generateEasyTarget(deck, mode);
 }
