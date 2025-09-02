@@ -582,6 +582,8 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
 });
 
 export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', inputSchema: SpecialActionInputSchema }, async ({ gameId, playerId, card, target }) => {
+    let turnShouldAdvance = true;
+
     await runTransaction(db, async (transaction) => {
         const gameRef = doc(db, 'games', gameId);
         const gameDoc = await transaction.get(gameRef);
@@ -598,6 +600,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const clonedCard = { ...(target as Card), id: `cloned-${Date.now()}` };
                 const newHand = [...player.hand, clonedCard];
                 transaction.update(playerRef, { hand: newHand });
+                turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
             case 'SB': { // Sabotage Card
@@ -644,13 +647,17 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
             }
         }
 
-        // After resolving the action, the player's turn is over.
-        const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
-        transaction.update(actingPlayerRef, { passed: true });
-        
+        // For cards that end the turn, mark the player as having passed.
+        if (turnShouldAdvance) {
+            const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
+            transaction.update(actingPlayerRef, { passed: true });
+        }
     });
-     // After resolving, advance the turn.
-    await advanceTurn(gameId);
+
+     // After resolving, advance the turn if necessary
+    if (turnShouldAdvance) {
+        await advanceTurn(gameId);
+    }
 });
 
 export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputSchema: EndSpecialActionInputSchema}, async ({ gameId }) => {
