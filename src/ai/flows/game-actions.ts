@@ -458,7 +458,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     }
 
     // Deal starting card to first player, but not in special mode
-    if (game.gameMode !== 'special' && freshDeck.length > 0) {
+    if ((game.gameMode === 'easy' || game.gameMode === 'pro') && freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerHand = dealtHands[firstPlayerId];
       if (firstPlayerHand) {
@@ -700,6 +700,10 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const cardValues = newTargetCards.map(c => CARD_VALUES[c.rank] as number);
                 const newTargetNumber = parseInt(cardValues.join(''), 10);
                 
+                if (isNaN(newTargetNumber)) {
+                    throw new Error("Destiny card created an invalid target number.");
+                }
+
                 transaction.update(gameRef, {
                     targetCards: newTargetCards,
                     targetNumber: newTargetNumber,
