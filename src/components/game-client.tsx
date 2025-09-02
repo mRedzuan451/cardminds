@@ -75,21 +75,27 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
   useEffect(() => {
     const join = async () => {
-      if (game && players && !hasJoined) {
+      if (game && players && !loading && gameDoc?.exists() && !hasJoined) {
         if (!players.find(p => p.name === localPlayerName)) {
-            try {
-              await gameActions.joinGame({ gameId, playerName: localPlayerName });
-              toast({ title: `Joined game!`, description: `Welcome, ${localPlayerName}!`});
-              setHasJoined(true);
-            } catch (e: any) {
-              toast({ title: 'Error joining game', description: e.message, variant: 'destructive' });
-              router.push('/');
-            }
+          try {
+            console.log(`[GameClient] Player '${localPlayerName}' not found in game '${gameId}', attempting to join.`);
+            await gameActions.joinGame({ gameId, playerName: localPlayerName });
+            toast({ title: `Joined game!`, description: `Welcome, ${localPlayerName}!`});
+            setHasJoined(true); 
+          } catch (e: any) {
+            console.error(`[GameClient] Error joining game:`, e);
+            toast({ title: 'Error joining game', description: e.message, variant: 'destructive' });
+            router.push('/');
+          }
+        } else {
+            console.log(`[GameClient] Player '${localPlayerName}' already in game '${gameId}'. Skipping join.`);
+            setHasJoined(true);
         }
       }
     };
     join();
-  }, [game, players, gameId, localPlayerName, router, toast, hasJoined]);
+  }, [game, players, gameId, localPlayerName, router, toast, hasJoined, loading, gameDoc]);
+
 
   const currentPlayer = useMemo(() => {
     if (!game || !players || players.length === 0) return null;
@@ -320,7 +326,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
              <div className="space-y-4">
               <h3 className="text-2xl font-bold">Players ({players.length}/{game.maxPlayers})</h3>
               <div className="grid gap-2">
-                {players.map(p => <div key={p.id} className="text-xl p-2 bg-muted rounded-md">{p.name} {p.id === game.creatorId && '(Creator)'}</div>)}
+                {players.map(p => <div key={p.id} className="text-xl p-2 bg-muted rounded-md">{p.name} {p.id === game.creatorId && '(Creator)'} {p.id === localPlayer.id && '(You)'}</div>)}
               </div>
             </div>
             {localPlayer.id === game.creatorId && (
@@ -348,11 +354,11 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 </div>
               </div>
             )}
-            <div className="flex gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
               <Button onClick={handleStartGame} size="lg" className="text-2xl flex-grow" disabled={localPlayer.id !== game.creatorId}>
                 Start Game
               </Button>
-               <Button onClick={handleBackToMenu} size="lg" className="text-2xl" variant="outline">
+               <Button onClick={handleBackToMenu} size="lg" className="text-2xl flex-grow" variant="outline">
                 <ArrowLeft className="mr-2 h-5 w-5"/> Menu
               </Button>
             </div>
@@ -564,5 +570,3 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     </div>
   );
 }
-
-    
