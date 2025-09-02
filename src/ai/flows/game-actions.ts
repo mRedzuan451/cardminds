@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Game actions managed by Genkit flows.
@@ -410,13 +411,40 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     const firstPlayerId = game.players[0];
     
     const dealtHands: Record<string, Card[]> = {};
-    // Reset players for the new round and deal 5 cards
-    players.forEach(p => {
-        const hand = freshDeck.splice(0, 5);
-        dealtHands[p.id] = hand;
-        const playerRef = doc(db, 'games', gameId, 'players', p.id);
-        transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [], cardsUsed: [] });
-    });
+    
+    if (game.gameMode === 'special') {
+        // In special mode, players keep their hand and draw 3 new cards
+        players.forEach(p => {
+            const newCards = freshDeck.splice(0, 3);
+            const newHand = [...p.hand, ...newCards];
+            dealtHands[p.id] = newHand; // Store for the first player draw logic
+            const playerRef = doc(db, 'games', gameId, 'players', p.id);
+            transaction.update(playerRef, { 
+                hand: newHand, 
+                roundScore: 0, 
+                passed: false, 
+                finalResult: 0, 
+                equation: [], 
+                cardsUsed: [] 
+            });
+        });
+
+    } else {
+        // In other modes, deal 5 fresh cards
+        players.forEach(p => {
+            const hand = freshDeck.splice(0, 5);
+            dealtHands[p.id] = hand;
+            const playerRef = doc(db, 'games', gameId, 'players', p.id);
+            transaction.update(playerRef, { 
+                hand, 
+                roundScore: 0, 
+                passed: false, 
+                finalResult: 0, 
+                equation: [], 
+                cardsUsed: [] 
+            });
+        });
+    }
 
     // Deal starting card to first player
     if (freshDeck.length > 0) {
@@ -594,8 +622,8 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 newTargetCards[targetCardIndex] = newCard;
 
                 // Re-evaluate the target number based on the new cards
-                const cardValues = newTargetCards.map(c => evaluateEquation([getCardValues(game.gameMode)[c.rank] as number], game.gameMode));
-                const newTargetNumber = cardValues.reduce((acc, val) => (acc as number) + (val as number), 0);
+                const cardValues = newTargetCards.map(c => getCardValues(game.gameMode)[c.rank]);
+                const newTargetNumber = parseInt(cardValues.join(''), 10);
                 
                 transaction.update(gameRef, {
                     targetCards: newTargetCards,
