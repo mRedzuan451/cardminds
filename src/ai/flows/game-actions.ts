@@ -55,6 +55,12 @@ const EndSpecialActionInputSchema = z.object({
     gameId: z.string(),
 });
 
+const DiscardCardsInputSchema = z.object({
+    gameId: z.string(),
+    playerId: z.string(),
+    cardsToDiscard: z.array(CardSchema),
+});
+
 
 // Flows
 export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: CreateGameInputSchema }, async ({ creatorName }) => {
@@ -381,6 +387,8 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
 });
 
 export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
+  let playerToDiscard: string | null = null;
+
   await runTransaction(db, async (transaction) => {
     console.log(`[nextRound] Starting next round for game ${gameId}`);
     // Read phase
@@ -412,7 +420,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     
     if (game.gameMode === 'special') {
         // In special mode, players keep their hand and draw 3 new cards
-        players.forEach(p => {
+        for (const p of players) {
             const newCards = freshDeck.splice(0, 3);
             const newHand = [...p.hand, ...newCards];
             dealtHands[p.id] = newHand; // Store for the first player draw logic
@@ -425,7 +433,12 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
                 equation: [], 
                 cardsUsed: [] 
             });
-        });
+
+            // Check for discard condition
+            if (newHand.length > 10 && !playerToDiscard) {
+                playerToDiscard = p.id;
+            }
+        }
 
     } else {
         // In other modes, deal 5 fresh cards
@@ -454,18 +467,67 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
           console.log(`[nextRound] Dealt starting card to first player ${firstPlayerId}.`);
       }
     }
-
-    transaction.update(gameRef, {
-      gameState: 'playerTurn',
-      deck: freshDeck,
-      targetNumber: target,
-      targetCards: cardsUsed,
-      currentPlayerId: game.players[0],
-      currentRound: game.currentRound + 1,
-      roundWinnerIds: [],
-    });
-    console.log(`[nextRound] Round ${game.currentRound + 1} started.`);
+    
+    // Determine next game state
+    if (playerToDiscard) {
+        console.log(`[nextRound] Player ${playerToDiscard} must discard cards.`);
+        transaction.update(gameRef, {
+            gameState: 'discarding',
+            discardingPlayerId: playerToDiscard,
+            deck: freshDeck,
+            targetNumber: target,
+            targetCards: cardsUsed,
+            currentPlayerId: playerToDiscard, // The player discarding is the current player
+            currentRound: game.currentRound + 1,
+            roundWinnerIds: [],
+        });
+    } else {
+        transaction.update(gameRef, {
+          gameState: 'playerTurn',
+          deck: freshDeck,
+          targetNumber: target,
+          targetCards: cardsUsed,
+          currentPlayerId: game.players[0],
+          currentRound: game.currentRound + 1,
+          roundWinnerIds: [],
+        });
+        console.log(`[nextRound] Round ${game.currentRound + 1} started.`);
+    }
   });
+});
+
+export const discardCards = ai.defineFlow({ name: 'discardCards', inputSchema: DiscardCardsInputSchema }, async ({ gameId, playerId, cardsToDiscard }) => {
+    await runTransaction(db, async (transaction) => {
+        const gameRef = doc(db, 'games', gameId);
+        const playerRef = doc(db, 'games', gameId, 'players', playerId);
+        const gameDoc = await transaction.get(gameRef);
+        const playerDoc = await transaction.get(playerRef);
+
+        if (!gameDoc.exists() || !playerDoc.exists()) throw new Error("Game or player not found");
+        const game = gameDoc.data() as Game;
+        const player = playerDoc.data() as Player;
+
+        if (game.gameState !== 'discarding' || game.discardingPlayerId !== playerId) {
+            throw new Error("Not the right time or player to discard.");
+        }
+        if (cardsToDiscard.length !== 3) {
+            throw new Error("You must discard exactly 3 cards.");
+        }
+
+        const discardIds = new Set(cardsToDiscard.map(c => c.id));
+        const newHand = player.hand.filter(c => !discardIds.has(c.id));
+
+        if (newHand.length !== player.hand.length - 3) {
+            throw new Error("Some cards to discard were not found in your hand.");
+        }
+        
+        transaction.update(playerRef, { hand: newHand });
+        transaction.update(gameRef, {
+            gameState: 'playerTurn',
+            discardingPlayerId: null,
+            currentPlayerId: game.players[0] // Start turn from the first player in the list
+        });
+    });
 });
 
 export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInputSchema, outputSchema: z.string() }, async ({ gameId }) => {
@@ -668,4 +730,3 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
-

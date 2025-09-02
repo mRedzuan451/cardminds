@@ -26,7 +26,7 @@ export interface Player {
     cardsUsed?: Card[];
 }
 
-export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction';
+export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction' | 'discarding';
 
 export interface Game {
     id: string;
@@ -48,4 +48,5 @@ export interface Game {
         playerId: string;
         cardRank: 'CL' | 'SB' | 'SH' | 'DE';
     };
+    discardingPlayerId?: string | null;
 }

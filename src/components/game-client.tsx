@@ -41,6 +41,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [showConfetti, setShowConfetti] = useState(false);
   const [isRematching, setIsRematching] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [selectedToDiscard, setSelectedToDiscard] = useState<Set<string>>(new Set());
   
   const { toast } = useToast();
   const router = useRouter();
@@ -105,12 +106,23 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     return currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
   }, [currentPlayer, localPlayer, game]);
 
+  const isDiscarding = useMemo(() => {
+    return game?.gameState === 'discarding' && game.discardingPlayerId === localPlayer?.id;
+  }, [game, localPlayer]);
+
   // Reset equation when turn changes
   useEffect(() => {
     if (!isMyTurn) {
         handleClearEquation();
     }
   }, [isMyTurn]);
+
+  // Reset discard selection when discard state changes
+  useEffect(() => {
+    if (!isDiscarding) {
+        setSelectedToDiscard(new Set());
+    }
+  }, [isDiscarding]);
 
 
   const activeHand = useMemo(() => {
@@ -289,6 +301,30 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     });
     await gameActions.endSpecialAction({ gameId });
   };
+
+  const handleDiscardCardClick = (card: CardType) => {
+    const newSelection = new Set(selectedToDiscard);
+    if (newSelection.has(card.id)) {
+        newSelection.delete(card.id);
+    } else {
+        if (newSelection.size < 3) {
+            newSelection.add(card.id);
+        } else {
+            toast({ title: "You can only select 3 cards to discard.", variant: "destructive" });
+        }
+    }
+    setSelectedToDiscard(newSelection);
+  };
+  
+  const handleConfirmDiscard = async () => {
+    if (!isDiscarding || !localPlayer || selectedToDiscard.size !== 3) return;
+    const cardsToDiscard = activeHand.filter(card => selectedToDiscard.has(card.id));
+    try {
+        await gameActions.discardCards({ gameId, playerId: localPlayer.id, cardsToDiscard });
+    } catch (e: any) {
+        toast({ title: "Error Discarding Cards", description: e.message, variant: "destructive" });
+    }
+  };
   
   const renderSpecialActionUI = () => {
     if (game?.gameState !== 'specialAction' || !game.specialAction || game.specialAction.playerId !== localPlayer?.id) return null;
@@ -333,6 +369,45 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 )}
                  <AlertDialogFooter>
                     <Button variant="ghost" onClick={() => gameActions.endSpecialAction({ gameId })}>Cancel</Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
+const renderDiscardUI = () => {
+    if (!isDiscarding) return null;
+
+    return (
+        <AlertDialog open={true}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Too Many Cards!</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Your hand has more than 10 cards. Please select exactly 3 cards to discard.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div>
+                    <p className="mb-2 font-bold">Selected: {selectedToDiscard.size} / 3</p>
+                    <div className="flex flex-wrap gap-2 justify-center max-h-64 overflow-y-auto">
+                        {activeHand.map((card) => (
+                            <GameCard
+                                key={card.id}
+                                card={card}
+                                mode={game?.gameMode}
+                                onClick={() => handleDiscardCardClick(card)}
+                                className={cn(selectedToDiscard.has(card.id) && "ring-4 ring-offset-2 ring-primary")}
+                            />
+                        ))}
+                    </div>
+                </div>
+                <AlertDialogFooter>
+                    <Button
+                        disabled={selectedToDiscard.size !== 3}
+                        onClick={handleConfirmDiscard}
+                    >
+                        Confirm Discard
+                    </Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -448,6 +523,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     <div className="container mx-auto p-4 md:p-8 space-y-6">
       {showConfetti && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
       {renderSpecialActionUI()}
+      {renderDiscardUI()}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         {/* Column 1: Scoreboard */}
