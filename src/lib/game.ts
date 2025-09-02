@@ -33,34 +33,27 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
 
 export function createDeck(mode: GameMode, playerCount: number): Card[] {
     let deck: Card[] = [];
-    let cardIdCounter = 0;
-
-    // Determine the number of standard 52-card decks based on player count.
     const standardDeckCount = playerCount >= 4 ? 2 : 1;
 
     // Create the standard card decks
     for (let i = 0; i < standardDeckCount; i++) {
         for (const suit of SUITS) {
             for (const rank of RANKS) {
-                deck.push({ id: `card-${cardIdCounter++}`, suit, rank });
+                // Generate a guaranteed unique ID
+                deck.push({ id: `deck-${i}-${suit}-${rank}`, suit, rank });
             }
         }
     }
 
     // Add special cards for "Special" mode
     if (mode === 'special') {
-        let setsOfSpecialCards = 1; // Base for 1-3 players (2 of each card)
-        if (playerCount >= 4 && playerCount <= 7) {
-            setsOfSpecialCards = 2; // For 4-7 players (4 of each card)
-        } else if (playerCount === 8) {
-            setsOfSpecialCards = 4; // For 8 players (8 of each card)
-        }
+        const setsOfSpecialCards = standardDeckCount; // 1 set per standard deck
         
         for (let i = 0; i < setsOfSpecialCards; i++) {
             // Add a set of 2 of each special card type
             for (const rank of SPECIAL_RANKS) {
-                deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
-                deck.push({ id: `card-${cardIdCounter++}`, suit: 'Special', rank });
+                deck.push({ id: `deck-${i}-special-${rank}-1`, suit: 'Special', rank });
+                deck.push({ id: `deck-${i}-special-${rank}-2`, suit: 'Special', rank });
             }
         }
     }
