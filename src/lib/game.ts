@@ -31,12 +31,12 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
     return EASY_CARD_VALUES;
 }
 
-export function createDeck(playerCount: number, mode: GameMode = 'easy'): Card[] {
+export function createDeck(mode: GameMode, playerCount: number): Card[] {
     let deck: Card[] = [];
     let cardIdCounter = 0;
 
-    // Determine the number of standard 52-card decks
-    const standardDeckCount = (mode === 'special' && playerCount === 8) ? 2 : 1;
+    // Determine the number of standard 52-card decks based on player count.
+    const standardDeckCount = playerCount >= 4 ? 2 : 1;
 
     // Create the standard card decks
     for (let i = 0; i < standardDeckCount; i++) {
@@ -85,7 +85,7 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
     const CARD_VALUES = getCardValues(mode);
     
     while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
-        currentDeck = shuffleDeck(createDeck(1, mode));
+        currentDeck = shuffleDeck(createDeck(mode, 1)); // Create a dummy single deck just for target generation
         
         const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
         if (numIndex1 === -1) continue;
@@ -123,7 +123,11 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
         }
     }
 
-    return { target: result, cardsUsed, updatedDeck: currentDeck };
+    // After generating the target, remove the used cards from the actual game deck
+    const cardsUsedIds = new Set(cardsUsed.map(c => c.id));
+    const updatedDeck = deck.filter(c => !cardsUsedIds.has(c.id));
+
+    return { target: result, cardsUsed, updatedDeck };
 }
 
 function generateProTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
