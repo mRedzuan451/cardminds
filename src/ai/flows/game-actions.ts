@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Game actions managed by Genkit flows.
@@ -325,17 +324,16 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         throw new Error(`Invalid equation submitted: ${result.error}`);
       }
       console.log(`[playerAction] Equation result: ${result}`);
+      
+      const newScore = calculateScore(result as number, game.targetNumber, cardsUsedCount);
+      console.log(`[playerAction] Calculated score for ${playerId}: ${newScore}`);
+      transaction.update(playerRef, {
+        roundScore: newScore,
+        finalResult: result,
+        equation: equation,
+        passed: true, // Submitting also means you are done for the turn cycle
+      });
 
-      if (typeof result === 'number') {
-        const newScore = calculateScore(result, game.targetNumber, cardsUsedCount);
-        console.log(`[playerAction] Calculated score for ${playerId}: ${newScore}`);
-        transaction.update(playerRef, {
-          roundScore: newScore,
-          finalResult: result,
-          equation: equation,
-          passed: true, // Submitting also means you are done for the turn cycle
-        });
-      }
     } else { // action === 'pass'
         console.log(`[playerAction] Player ${playerId} passed.`);
         transaction.update(playerRef, {
@@ -499,9 +497,57 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             let newDeck = [...game.deck];
             const cardsToDraw = player.hand.length - 1; // -1 because we removed the shuffle card
             const newCards = newDeck.splice(0, cardsToDraw);
-            transaction.update(playerRef, { hand: newCards });
+            transaction.update(playerRef, { hand: newCards, passed: true });
             transaction.update(gameRef, { deck: newDeck });
-            await advanceTurn(gameId); // End turn after shuffling
+
+            // Since we are already in a transaction, we cannot call advanceTurn.
+            // We must replicate the logic here.
+            const playersQuery = query(collection(db, 'games', gameId, 'players'));
+            const playerDocsSnap = await getDocs(playersQuery);
+            let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+            
+            // Manually update the current player's passed status for the check
+            const currentPlayerInList = players.find(p => p.id === playerId);
+            if(currentPlayerInList) currentPlayerInList.passed = true;
+
+            const allPlayersHaveActed = players.every(p => p.passed);
+
+            if (allPlayersHaveActed) {
+                const highestScore = Math.max(...players.map(p => p.roundScore));
+                const winners = players.filter(p => p.roundScore === highestScore);
+                const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
+                players.forEach(p => {
+                    const pRef = doc(db, 'games', gameId, 'players', p.id);
+                    transaction.update(pRef, { totalScore: p.totalScore + p.roundScore });
+                });
+                transaction.update(gameRef, { gameState: 'roundOver', roundWinnerIds });
+            } else {
+                const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
+                let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
+                let nextPlayerId: string | null = null;
+                for (let i = 0; i < game.players.length; i++) {
+                    const potentialNextPlayerId = game.players[nextPlayerIndex];
+                    const playerDoc = players.find(p => p.id === potentialNextPlayerId);
+                    if (playerDoc && !playerDoc.passed) {
+                        nextPlayerId = potentialNextPlayerId;
+                        break;
+                    }
+                    nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
+                }
+
+                if(nextPlayerId) {
+                    const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
+                    const nextPlayer = players.find(p => p.id === nextPlayerId!);
+                    if (nextPlayer && newDeck.length > 0) {
+                        const newCard = newDeck.shift()!;
+                        const nextPlayerNewHand = [...nextPlayer.hand, newCard];
+                        transaction.update(nextPlayerRef, { hand: nextPlayerNewHand });
+                        transaction.update(gameRef, { deck: newDeck, currentPlayerId: nextPlayerId });
+                    } else {
+                       transaction.update(gameRef, { currentPlayerId: nextPlayerId });
+                    }
+                }
+            }
         } else {
              // For other cards, set game state to get more input
             transaction.update(gameRef, { 
@@ -527,6 +573,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
             case 'CL': { // Clone Card
                 const playerRef = doc(db, 'games', gameId, 'players', playerId);
                 const playerDoc = await transaction.get(playerRef);
+                if (!playerDoc.exists()) throw new Error("Player not found");
                 const player = playerDoc.data() as Player;
                 const clonedCard = target as Card;
                 const newHand = [...player.hand, clonedCard];
@@ -537,21 +584,28 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const targetPlayerId = target as string;
                 const targetPlayerRef = doc(db, 'games', gameId, 'players', targetPlayerId);
                 const targetPlayerDoc = await transaction.get(targetPlayerRef);
+                if (!targetPlayerDoc.exists()) throw new Error("Target player not found");
                 const targetPlayer = targetPlayerDoc.data() as Player;
                 const hand = targetPlayer.hand;
-                const cardToRemoveIndex = Math.floor(Math.random() * hand.length);
-                hand.splice(cardToRemoveIndex, 1);
-                transaction.update(targetPlayerRef, { hand: hand });
+                if(hand.length > 0) {
+                    const cardToRemoveIndex = Math.floor(Math.random() * hand.length);
+                    hand.splice(cardToRemoveIndex, 1);
+                    transaction.update(targetPlayerRef, { hand: hand });
+                }
                 break;
             }
             case 'DE': { // Destiny Card
                 const targetCardIndex = target as number;
                 let newDeck = [...game.deck];
+                if (newDeck.length === 0) throw new Error("Deck is empty, cannot use Destiny card.");
+                
                 const newCard = newDeck.shift()!;
                 const newTargetCards = [...game.targetCards];
                 newTargetCards[targetCardIndex] = newCard;
 
-                const { target: newTargetNumber } = generateTarget(newDeck, game.gameMode);
+                // Re-evaluate the target number based on the new cards
+                const cardValues = newTargetCards.map(c => evaluateEquation([getCardValues(game.gameMode)[c.rank] as number], game.gameMode));
+                const newTargetNumber = cardValues.reduce((acc, val) => (acc as number) + (val as number), 0);
                 
                 transaction.update(gameRef, {
                     targetCards: newTargetCards,
@@ -561,9 +615,13 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 break;
             }
         }
+
+        // After resolving the action, the player's turn is over.
+        const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
+        transaction.update(actingPlayerRef, { passed: true });
         
     });
-     // After resolving, advance the turn
+     // After resolving, advance the turn.
     await advanceTurn(gameId);
 });
 
