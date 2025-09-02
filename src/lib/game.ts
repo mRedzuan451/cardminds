@@ -123,52 +123,87 @@ export function generateTarget(deck: Card[], mode: 'easy' | 'pro'): { target: nu
 export function evaluateEquation(equation: EquationTerm[], mode: GameMode): number | { error: string } {
   if (equation.length === 0) return { error: "Equation is empty." };
 
-  let processedEquation = [...equation];
+  let terms = [...equation];
   
   if (mode === 'pro') {
-    const newEquation: EquationTerm[] = [];
-    for (let i = 0; i < processedEquation.length; i++) {
-        newEquation.push(processedEquation[i]);
-        const currentTerm = processedEquation[i];
-        const nextTerm = processedEquation[i + 1];
-
-        // Case 1: (x)y -> (x)*y  e.g. [')', 5]
-        const isClosingParen = currentTerm === ')';
-        const isNextTermNumber = typeof nextTerm === 'number';
-        if (isClosingParen && isNextTermNumber) {
-            newEquation.push('*');
-            continue;
-        }
-
-        // Case 2: x(y) -> x*(y) e.g. [5, '(']
-        const isCurrentTermNumber = typeof currentTerm === 'number';
-        const isOpeningParen = nextTerm === '(';
-        if (isCurrentTermNumber && isOpeningParen) {
-            newEquation.push('*');
+    const newTerms: EquationTerm[] = [];
+    for (let i = 0; i < terms.length; i++) {
+        newTerms.push(terms[i]);
+        const currentTerm = terms[i];
+        const nextTerm = terms[i + 1];
+        if (currentTerm === ')' && typeof nextTerm === 'number') {
+            newTerms.push('*');
+        } else if (typeof currentTerm === 'number' && nextTerm === '(') {
+            newTerms.push('*');
         }
     }
-    processedEquation = newEquation;
+    terms = newTerms;
   }
-  
-  const equationString = processedEquation.join(' ');
+
+  const values: number[] = [];
+  const ops: string[] = [];
+
+  const precedence = (op: string): number => {
+    if (op === '+' || op === '-') return 1;
+    if (op === '*' || op === '/') return 2;
+    return 0;
+  };
+
+  const applyOp = () => {
+    const op = ops.pop();
+    if (!op) return;
+    const right = values.pop();
+    const left = values.pop();
+    if (left === undefined || right === undefined) {
+      throw new Error('Invalid expression');
+    }
+    switch (op) {
+      case '+': values.push(left + right); break;
+      case '-': values.push(left - right); break;
+      case '*': values.push(left * right); break;
+      case '/':
+        if (right === 0) throw new Error('Division by zero');
+        values.push(left / right);
+        break;
+    }
+  };
 
   try {
-    // Basic validation to prevent arbitrary code execution
-    const safeCharsRegex = /^[0-9+\-*/().\s]+$/;
-    if (!safeCharsRegex.test(equationString)) {
-        return { error: 'Invalid characters in equation.' };
+    for (const term of terms) {
+      if (typeof term === 'number') {
+        values.push(term);
+      } else if (term === '(') {
+        ops.push(term);
+      } else if (term === ')') {
+        while (ops.length && ops[ops.length - 1] !== '(') {
+          applyOp();
+        }
+        if (ops.length === 0) throw new Error('Mismatched parentheses');
+        ops.pop(); // Pop '('.
+      } else { // Operator
+        while (ops.length && precedence(ops[ops.length - 1]) >= precedence(term)) {
+          applyOp();
+        }
+        ops.push(term);
+      }
     }
 
-    const result = new Function(`return ${equationString}`)();
+    while (ops.length) {
+      applyOp();
+    }
+
+    if (values.length !== 1 || ops.length !== 0) {
+        throw new Error('Invalid expression');
+    }
+
+    const result = values[0];
     if (typeof result !== 'number' || !isFinite(result)) {
       return { error: 'Invalid calculation result.' };
     }
     return result;
-  } catch (e) {
-    if (e instanceof SyntaxError) {
-      return { error: 'Invalid mathematical expression: Check parentheses and operators.'}
-    }
-    return { error: 'Invalid mathematical expression.' };
+
+  } catch (e: any) {
+    return { error: e.message || 'Invalid mathematical expression.' };
   }
 }
 

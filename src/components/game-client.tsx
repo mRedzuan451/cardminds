@@ -174,20 +174,17 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         return;
     }
     
-    if (typeof result === 'number') {
-      try {
-        await gameActions.playerAction({
-          gameId,
-          playerId: localPlayer.id,
-          action: 'submit',
-          equation,
-          result,
-          cardsUsedCount: usedCardIndices.size,
-        });
-        handleClearEquation();
-      } catch (e: any) {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
-      }
+    try {
+      await gameActions.playerAction({
+        gameId,
+        playerId: localPlayer.id,
+        action: 'submit',
+        equation,
+        cardsUsedCount: usedCardIndices.size,
+      });
+      handleClearEquation();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
   
@@ -287,7 +284,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!game || !game.roundWinnerIds || game.roundWinnerIds.length === 0 || !players) return null;
     const winners = players.filter(p => game.roundWinnerIds?.includes(p.id));
     if (winners.length > 1) {
-        return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It's a Draw!</p>;
+        return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">It&apos;s a Draw!</p>;
     }
     if (winners.length === 0) {
       return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">No winner this round!</p>;
@@ -368,22 +365,44 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
       {showConfetti && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
-        <Card className="text-center p-4 shadow-lg w-full">
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        {/* Column 1: Scoreboard */}
+        <Card className="text-center p-4 shadow-lg w-full md:col-span-1">
           <CardHeader className="p-0 mb-2">
             <CardTitle className="text-lg text-muted-foreground font-headline">Scoreboard (Round {game.currentRound}/{game.totalRounds})</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 grid gap-4" style={{gridTemplateColumns: `repeat(${players.length}, minmax(0, 1fr))`}}>
+          <CardContent className="p-0 grid gap-2">
               {players.map(p => (
-                <div key={p.id} className={cn("flex items-center gap-2 text-lg font-bold p-2 rounded-md", p.id === currentPlayer?.id && "bg-primary/20")}>
+                <div key={p.id} className={cn(
+                  "flex items-center gap-2 text-lg font-bold p-2 rounded-md transition-all",
+                  p.id === currentPlayer?.id && "bg-primary/20 scale-105"
+                )}>
                     <User /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}: <span className="text-primary">{p.totalScore}</span>
                 </div>
               ))}
           </CardContent>
         </Card>
         
-        <div className="w-full md:w-auto flex-grow flex flex-col items-center justify-center gap-4">
-            <div className="flex gap-2 w-full max-w-xs">
+        {/* Column 2: Target & Turn Indicator */}
+        <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
+            <Card className="text-center p-4 shadow-lg w-full">
+              <CardHeader className="p-0 mb-1">
+                  <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 flex items-center justify-center gap-2">
+                  <p className="text-6xl font-bold text-primary">{game.targetNumber}</p>
+                  <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
+                  <Lightbulb className="h-6 w-6" />
+                  <span className="sr-only">Show hint</span>
+                  </Button>
+              </CardContent>
+            </Card>
+        </div>
+
+        {/* Column 3: Actions */}
+        <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
+            <div className="flex gap-2 w-full">
               <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
                 <RefreshCw className="mr-2 h-5 w-5"/> New Game
               </Button>
@@ -391,18 +410,6 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 <ArrowLeft className="mr-2 h-5 w-5"/> Menu
               </Button>
             </div>
-            <Card className="text-center p-4 shadow-lg w-full max-w-xs">
-            <CardHeader className="p-0 mb-1">
-                <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex items-center justify-center gap-2">
-                <p className="text-6xl font-bold text-primary">{game.targetNumber}</p>
-                <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
-                <Lightbulb className="h-6 w-6" />
-                <span className="sr-only">Show hint</span>
-                </Button>
-            </CardContent>
-            </Card>
         </div>
       </div>
 
@@ -411,7 +418,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline text-2xl">Target Combination</AlertDialogTitle>
             <AlertDialogDescription>
-              Here's how the target number was created:
+              Here&apos;s how the target number was created:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-center items-center gap-2 my-4">
@@ -435,10 +442,52 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         </AlertDialogContent>
       </AlertDialog>
 
+      {isMyTurn && (
+        <Card className="shadow-lg sticky top-4 z-10 bg-card/90 backdrop-blur-sm p-3 md:col-start-2">
+          <CardHeader className="p-0">
+            <CardTitle className="font-headline flex items-center gap-2 text-xl">
+              <User />
+              Your Turn! ({game.gameMode} mode)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pt-3">
+            <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
+              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-3">
+              <div className={cn("grid grid-cols-2 gap-2", game.gameMode !== 'pro' && "hidden")}>
+                <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
+                <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button onClick={handleSubmitEquation} className="flex-grow" size="lg" disabled={equation.length === 0}>
+                  <Send className="mr-2 h-4 w-4"/> Submit
+                </Button>
+                <Button onClick={handlePass} className="flex-grow" variant="secondary" size="lg">
+                  <LogOut className="mr-2 h-4 w-4"/> Pass
+                </Button>
+                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="lg">
+                  <X className="mr-2 h-4 w-4"/> Clear
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isMyTurn && game.gameState === 'playerTurn' && (
+        <Card className="text-center p-4 shadow-lg md:col-start-2">
+          <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl">
+            <Users />
+            Waiting for {currentPlayer?.name} to play...
+          </CardTitle>
+        </Card>
+      )}
+
       {game.gameState === 'gameOver' && (
-         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
+         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
            <CardTitle className="text-5xl font-headline mb-4 flex items-center justify-center gap-4"><Trophy className="w-12 h-12 text-yellow-400" />Game Over!</CardTitle>
-           {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It's a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
+           {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It&apos;s a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
            {totalWinner.length === 1 && <p className="text-4xl font-bold my-6 text-primary">{totalWinner[0].name} is the Grand Winner!</p>}
            
            <div className="text-2xl font-bold">Final Scores</div>
@@ -460,7 +509,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
        )}
 
       {game.gameState === 'roundOver' && (
-        <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95">
+        <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
           <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {renderRoundWinner()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
@@ -487,56 +536,14 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
           </Button>
         </Card>
       )}
-      
-      {isMyTurn && (
-        <Card className="shadow-lg sticky top-4 z-10 bg-card/90 backdrop-blur-sm p-3 max-w-md mx-auto">
-          <CardHeader className="p-0">
-            <CardTitle className="font-headline flex items-center gap-2 text-xl">
-              <User />
-              Your Turn! ({game.gameMode} mode)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 pt-3">
-            <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
-              {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-3">
-              <div className={cn("grid grid-cols-2 gap-2", game.gameMode !== 'pro' && "hidden")}>
-                <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
-                <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Button onClick={handleSubmitEquation} className="flex-grow" size="sm" disabled={equation.length === 0}>
-                  <Send className="mr-2 h-4 w-4"/> Submit
-                </Button>
-                <Button onClick={handlePass} className="flex-grow" variant="secondary" size="sm">
-                  <LogOut className="mr-2 h-4 w-4"/> Pass
-                </Button>
-                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="sm">
-                  <X className="mr-2 h-4 w-4"/> Clear
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {!isMyTurn && game.gameState === 'playerTurn' && (
-        <Card className="text-center p-4 max-w-md mx-auto shadow-lg">
-          <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl">
-            <Users />
-            Waiting for {currentPlayer?.name} to play...
-          </CardTitle>
-        </Card>
-      )}
-
-      <div className="space-y-4 pt-4">
-          <div>
+      <div className="pt-8">
+          <div className="text-center">
             <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
               <User />
               Your Hand
             </h2>
-            <div className="flex flex-wrap justify-center gap-2 md:gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               {activeHand.map((card, index) => (
                 <div key={`${card.suit}-${card.rank}-${index}`} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
                   <GameCard
