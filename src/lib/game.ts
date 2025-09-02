@@ -23,20 +23,22 @@ export const EASY_CARD_VALUES: Record<Rank, EquationTerm> = {
 
 export const SPECIAL_CARD_VALUES: Record<Rank, EquationTerm> = {
     ...PRO_CARD_VALUES,
+    'K': '**' // Power of
 };
 
 
 export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
-    if (mode === 'pro' || mode === 'special') return PRO_CARD_VALUES;
+    if (mode === 'special') return SPECIAL_CARD_VALUES;
+    if (mode === 'pro') return PRO_CARD_VALUES;
     return EASY_CARD_VALUES;
 }
 
 export function createDeck(mode: GameMode, playerCount: number): Card[] {
     let deck: Card[] = [];
-    const standardDeckCount = playerCount >= 4 ? 2 : 1;
+    const deckCount = playerCount >= 4 ? 2 : 1;
 
     // Create the standard card decks
-    for (let i = 0; i < standardDeckCount; i++) {
+    for (let i = 0; i < deckCount; i++) {
         for (const suit of SUITS) {
             for (const rank of RANKS) {
                 // Generate a guaranteed unique ID
@@ -47,7 +49,7 @@ export function createDeck(mode: GameMode, playerCount: number): Card[] {
 
     // Add special cards for "Special" mode
     if (mode === 'special') {
-        const setsOfSpecialCards = standardDeckCount; // 1 set per standard deck
+        const setsOfSpecialCards = deckCount;
         
         for (let i = 0; i < setsOfSpecialCards; i++) {
             // Add a set of 2 of each special card type
@@ -84,7 +86,7 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
         if (numIndex1 === -1) continue;
         let numCard1 = currentDeck.splice(numIndex1, 1)[0];
         
-        const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/' && c.suit !== 'Special');
+        const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/' && CARD_VALUES[c.rank] !== '**' && c.suit !== 'Special');
         if (opIndex === -1) continue;
         const opCard = currentDeck.splice(opIndex, 1)[0];
 
@@ -136,10 +138,10 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
 
   // Randomly select two distinct number cards for the target
   const card1Index = Math.floor(Math.random() * numberCards.length);
-  const card1 = numberCards.splice(card1Index, 1)[0]; 
+  let card1 = numberCards[card1Index]; 
   
   const card2Index = Math.floor(Math.random() * numberCards.length);
-  const card2 = numberCards[card2Index];
+  let card2 = numberCards[card2Index];
   
   if (!card1 || !card2) {
     // This is a fallback in case something goes wrong, should not be hit
@@ -186,6 +188,21 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
   if (equation.length === 0) return { error: "Equation is empty." };
 
   let terms = [...equation];
+
+   // In special mode, handle '**' (power) as a postfix operator needing '2'
+  if (mode === 'special') {
+    const specialTerms: EquationTerm[] = [];
+    for (let i = 0; i < terms.length; i++) {
+        const currentTerm = terms[i];
+        if (currentTerm === '**') {
+            // It becomes power of 2
+            specialTerms.push(currentTerm, 2);
+        } else {
+            specialTerms.push(currentTerm);
+        }
+    }
+    terms = specialTerms;
+  }
   
   if (mode === 'pro' || mode === 'special') {
     const newTerms: EquationTerm[] = [];
@@ -212,12 +229,24 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
   const precedence = (op: string): number => {
     if (op === '+' || op === '-') return 1;
     if (op === '*' || op === '/') return 2;
+    if (op === '**') return 3;
     return 0;
   };
 
   const applyOp = () => {
     const op = ops.pop();
     if (!op) return;
+
+    if (op === '**') {
+      const left = values.pop();
+      const right = values.pop(); // In our case, the '2'
+       if (left === undefined || right === undefined) {
+        throw new Error('Invalid expression for power operation');
+      }
+      values.push(Math.pow(right, left));
+      return;
+    }
+
     const right = values.pop();
     const left = values.pop();
     if (left === undefined || right === undefined) {
@@ -235,24 +264,28 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
   };
 
   try {
-    for (const term of terms) {
-      if (typeof term === 'number') {
-        values.push(term);
-      } else if (term === '(') {
-        ops.push(term);
-      } else if (term === ')') {
-        while (ops.length && ops[ops.length - 1] !== '(') {
-          applyOp();
+    // Shunting-yard algorithm
+    // We process the equation from right to left because of how power of 2 is implemented
+    for (let i = terms.length - 1; i >= 0; i--) {
+        const term = terms[i];
+        if (typeof term === 'number') {
+            values.push(term);
+        } else if (term === ')') {
+            ops.push(term);
+        } else if (term === '(') {
+            while (ops.length && ops[ops.length - 1] !== ')') {
+                applyOp();
+            }
+            if (ops.length === 0) throw new Error('Mismatched parentheses');
+            ops.pop(); // Pop ')'
+        } else { // Operator
+            while (ops.length && precedence(ops[ops.length - 1]) > precedence(term as string)) {
+                applyOp();
+            }
+            ops.push(term as string);
         }
-        if (ops.length === 0) throw new Error('Mismatched parentheses');
-        ops.pop(); // Pop '('.
-      } else { // Operator
-        while (ops.length && precedence(ops[ops.length - 1]) >= precedence(term)) {
-          applyOp();
-        }
-        ops.push(term);
-      }
     }
+
 
     while (ops.length) {
       applyOp();

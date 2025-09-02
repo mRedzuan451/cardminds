@@ -29,7 +29,7 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
     return (
       <div
         className={cn(
-          "aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
+          "aspect-[2.b5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
           className
         )}
         {...props}
@@ -64,7 +64,7 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
         <Icon className="h-4 w-4 md:h-5 md:w-5" />
       </div>
       <div className="self-center text-3xl md:text-4xl font-bold">
-        {value === '/' ? '÷' : value === '*' ? '×' : value}
+        {value === '/' ? '÷' : value === '*' ? '×' : value === '**' ? '^2' : value}
       </div>
       <div className="flex flex-col items-end rotate-180">
         <div className="text-xl md:text-2xl font-bold">{rank}</div>

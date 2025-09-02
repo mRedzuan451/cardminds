@@ -40,6 +40,7 @@ export default function RulesPage() {
               <li><span className="font-bold">Ace (A):</span> The number 1</li>
               <li><span className="font-bold">King (K) in Easy Mode:</span> Multiplication (*)</li>
               <li><span className="font-bold">King (K) in Pro Mode:</span> Division (/)</li>
+              <li><span className="font-bold">King (K) in Special Mode:</span> Power of 2 (^2)</li>
             </ul>
             <p className="mt-4">
               In <strong>Pro Mode</strong>, multiplication must be done using parentheses, for example: (5+2)7 would be invalid, but (5+2)*7 is how you would do it.
@@ -70,6 +71,8 @@ export default function RulesPage() {
               <p>A simpler mode where equations must alternate between numbers and operators. The King card is multiplication (*).</p>
               <h3 className="font-bold text-xl mt-2">Pro Mode</h3>
               <p>A more complex mode where the target is generated from two concatenated cards (e.g. a 2 and 5 make a target of 25). The King card is division (/). Parentheses `()` can be used to group operations.</p>
+              <h3 className="font-bold text-xl mt-2">Special Mode</h3>
+              <p>This mode includes everything in Pro Mode, but adds powerful special cards to the deck. The King is now Power of 2 (^2).</p>
             </div>
           </section>
 
