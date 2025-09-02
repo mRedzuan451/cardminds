@@ -522,80 +522,25 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         if (cardIndex === -1) throw new Error("Card not in hand");
         const newHand = [...player.hand];
         newHand.splice(cardIndex, 1);
-        transaction.update(playerRef, { hand: newHand });
+        
 
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
-            const cardsToDraw = player.hand.length - 1; // -1 because we removed the shuffle card
-            const newCards = newDeck.splice(0, cardsToDraw);
-            transaction.update(playerRef, { hand: newCards, passed: true });
-            transaction.update(gameRef, { deck: newDeck });
-
-            // Since we are already in a transaction, we cannot call advanceTurn.
-            // We must replicate the logic here.
-            const playersQuery = query(collection(db, 'games', gameId, 'players'));
-            const playerDocsSnap = await getDocs(playersQuery);
-            let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+            // Don't count the shuffle card itself when determining how many to draw.
+            const cardsToDraw = player.hand.length - 1; 
+            const newCardsForHand = newDeck.splice(0, cardsToDraw);
             
-            // Manually update the current player's passed status for the check
-            const currentPlayerInList = players.find(p => p.id === playerId);
-            if(currentPlayerInList) currentPlayerInList.passed = true;
-
-            const allPlayersHaveActed = players.every(p => p.passed);
-
-            if (allPlayersHaveActed) {
-                // Round Over Logic
-                players.forEach(p => {
-                    const newTotalScore = p.totalScore + p.roundScore;
-                    const pRef = doc(db, 'games', gameId, 'players', p.id);
-                    transaction.update(pRef, { totalScore: newTotalScore });
-                    p.totalScore = newTotalScore;
-                });
-    
-                if (game.gameMode === 'special' && game.targetScore) {
-                    const winner = players.find(p => p.totalScore >= game.targetScore!);
-                    if (winner) {
-                        transaction.update(gameRef, { gameState: 'gameOver' });
-                        return;
-                    }
-                }
-
-                const highestScore = Math.max(...players.map(p => p.roundScore));
-                const winners = players.filter(p => p.roundScore === highestScore);
-                const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
-                transaction.update(gameRef, { gameState: 'roundOver', roundWinnerIds });
-            } else {
-                const currentPlayerIndex = game.players.indexOf(game.currentPlayerId);
-                let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
-                let nextPlayerId: string | null = null;
-                for (let i = 0; i < game.players.length; i++) {
-                    const potentialNextPlayerId = game.players[nextPlayerIndex];
-                    const playerDoc = players.find(p => p.id === potentialNextPlayerId);
-                    if (playerDoc && !playerDoc.passed) {
-                        nextPlayerId = potentialNextPlayerId;
-                        break;
-                    }
-                    nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
-                }
-
-                if(nextPlayerId) {
-                    const nextPlayerRef = doc(db, 'games', gameId, 'players', nextPlayerId);
-                    const nextPlayer = players.find(p => p.id === nextPlayerId!);
-                    if (nextPlayer && newDeck.length > 0) {
-                        const newCard = newDeck.shift()!;
-                        const nextPlayerNewHand = [...nextPlayer.hand, newCard];
-                        transaction.update(nextPlayerRef, { hand: nextPlayerNewHand });
-                        transaction.update(gameRef, { deck: newDeck, currentPlayerId: nextPlayerId });
-                    } else {
-                       transaction.update(gameRef, { currentPlayerId: nextPlayerId });
-                    }
-                }
-            }
+            // Update player's hand, but DO NOT end their turn.
+            transaction.update(playerRef, { hand: newCardsForHand });
+            transaction.update(gameRef, { deck: newDeck });
+            // The turn does not advance here. The player can now make a move.
+            
         } else {
              // For other cards, set game state to get more input
-            transaction.update(gameRef, { 
+             transaction.update(playerRef, { hand: newHand });
+             transaction.update(gameRef, { 
                 gameState: 'specialAction',
                 specialAction: {
                     playerId,
