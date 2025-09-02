@@ -1,5 +1,7 @@
+
 import type { SVGProps } from 'react';
-import type { Suit } from '@/lib/types';
+import type { Rank, Suit } from '@/lib/types';
+import { Sparkles, Copy, Skull, Shuffle, Wand2 } from 'lucide-react';
 
 const iconProps = {
   xmlns: "http://www.w3.org/2000/svg",
@@ -44,4 +46,25 @@ export const SuitIcons: Record<Suit, (props: SVGProps<SVGSVGElement>) => JSX.Ele
     Hearts: HeartsIcon,
     Diamonds: DiamondsIcon,
     Clubs: ClubsIcon,
+    Special: Sparkles,
 };
+
+export const SpecialIcons: Record<Rank, (props: SVGProps<SVGSVGElement>) => JSX.Element> = {
+    'CL': Copy,
+    'SB': Skull,
+    'SH': Shuffle,
+    'DE': Wand2,
+    'A': () => <></>,
+    '2': () => <></>,
+    '3': () => <></>,
+    '4': () => <></>,
+    '5': () => <></>,
+    '6': () => <></>,
+    '7': () => <></>,
+    '8': () => <></>,
+    '9': () => <></>,
+    '10': () => <></>,
+    'J': () => <></>,
+    'Q': () => <></>,
+    'K': () => <></>,
+}

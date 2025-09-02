@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
 import type { Card as CardType, EquationTerm, GameState, Game, Player } from '@/lib/types';
-import { evaluateEquation, getCardValues } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft, Copy } from 'lucide-react';
+import { evaluateEquation, getCardValues, SPECIAL_RANKS } from '@/lib/game';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft, Copy, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import Confetti from 'react-confetti';
 import { Label } from './ui/label';
-import { Slider } from './ui/slider';
 import { firebaseApp } from '@/lib/firebase';
 import * as gameActions from '@/ai/flows/game-actions';
 import { useRouter } from 'next/navigation';
@@ -126,6 +125,11 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!isMyTurn) return;
     if (usedCardIndices.has(index)) return;
 
+    if (card.suit === 'Special' && localPlayer) {
+        gameActions.playSpecialCard({ gameId, playerId: localPlayer.id, card });
+        return;
+    }
+
     const value = CARD_VALUES[card.rank];
     const lastTerm = equation.length > 0 ? equation[equation.length - 1] : null;
 
@@ -158,7 +162,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const handleSubmitEquation = async () => {
     if (!isMyTurn || !localPlayer || !game) return;
 
-    if (game.gameMode === 'easy') {
+    if (game.gameMode === 'easy' || game.gameMode === 'special') {
       if (equation.length < 3) {
         toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
         return;
@@ -207,7 +211,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     await gameActions.startGame({ gameId, gameMode: game.gameMode, numberOfPlayers: game.players.length });
   };
   
-  const handleSetGameMode = async (mode: 'easy' | 'pro') => {
+  const handleSetGameMode = async (mode: 'easy' | 'pro' | 'special') => {
     if (game?.creatorId === localPlayer?.id) {
         await gameActions.setGameMode({gameId, mode});
     }
@@ -273,6 +277,67 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     toast({title: "Game ID Copied!", description: "Share it with your friends to join."});
   }
 
+  const handleSpecialAction = async (target: any) => {
+    if (!game || !game.specialAction || !localPlayer) return;
+    await gameActions.resolveSpecialCard({
+        gameId,
+        playerId: localPlayer.id,
+        card: { suit: 'Special', rank: game.specialAction.cardRank },
+        target
+    });
+    await gameActions.endSpecialAction({ gameId });
+  };
+  
+  const renderSpecialActionUI = () => {
+    if (game?.gameState !== 'specialAction' || !game.specialAction || game.specialAction.playerId !== localPlayer?.id) return null;
+
+    const { cardRank } = game.specialAction;
+
+    return (
+        <AlertDialog open={true}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Play {CARD_VALUES[cardRank]} Card</AlertDialogTitle>
+                </AlertDialogHeader>
+                {cardRank === 'CL' && (
+                    <div>
+                        <p>Select a card from your hand to clone:</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {activeHand.map((card, index) => (
+                                <GameCard key={`${card.rank}-${index}`} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {cardRank === 'SB' && (
+                     <div>
+                        <p>Select a player to sabotage:</p>
+                        <div className="flex flex-col gap-2 mt-2">
+                             {players?.filter(p => p.id !== localPlayer?.id).map(p => (
+                                 <Button key={p.id} onClick={() => handleSpecialAction(p.id)}>{p.name}</Button>
+                             ))}
+                        </div>
+                     </div>
+                )}
+                 {cardRank === 'DE' && (
+                    <div>
+                        <p>Select a target card to re-roll:</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {game.targetCards.map((card, index) => (
+                                <GameCard key={`target-${index}`} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(index)} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+                 <AlertDialogFooter>
+                    <Button variant="ghost" onClick={() => gameActions.endSpecialAction({ gameId })}>Cancel</Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
+
   const equationString = useMemo(() => equation.map((term, i) => (
     <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
   )), [equation]);
@@ -280,7 +345,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const targetEquation = useMemo(() => {
     if (!game || !game.targetCards || game.targetCards.length === 0) return null;
     const CARD_VALUES = getCardValues(game.gameMode);
-    if (game.gameMode === 'easy') {
+    if (game.gameMode === 'easy' || game.gameMode === 'special') {
       return game.targetCards.map(c => CARD_VALUES[c.rank]).join(' ');
     }
     return null;
@@ -351,6 +416,15 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     <BrainCircuit className="mr-4 h-8 w-8" />
                     Pro
                   </Button>
+                   <Button
+                    onClick={() => handleSetGameMode('special')}
+                    size="lg"
+                    variant={game.gameMode === 'special' ? 'default' : 'outline'}
+                    className="h-24 text-2xl w-full border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
+                  >
+                    <Sparkles className="mr-4 h-8 w-8" />
+                    Special
+                  </Button>
                 </div>
               </div>
             )}
@@ -371,6 +445,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
       {showConfetti && <Confetti recycle={false} onConfettiComplete={() => setShowConfetti(false)} />}
+      {renderSpecialActionUI()}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         {/* Column 1: Scoreboard */}
@@ -408,7 +483,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
         {/* Column 3: Actions */}
         <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
-            <div className="flex gap-2 w-full">
+            <div className="flex flex-col md:flex-row gap-2 w-full">
               <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
                 <RefreshCw className="mr-2 h-5 w-5"/> New Game
               </Button>

@@ -1,7 +1,8 @@
+
 import { cn } from "@/lib/utils";
 import type { Card as CardType, Suit, GameMode } from "@/lib/types";
 import { getCardValues } from "@/lib/game";
-import { SuitIcons } from "./icons";
+import { SuitIcons, SpecialIcons } from "./icons";
 
 
 interface GameCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -14,8 +15,6 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
   const { suit, rank } = card;
   const CARD_VALUES = getCardValues(mode);
   const value = CARD_VALUES[rank];
-  const Icon = SuitIcons[suit];
-  const color = (suit === 'Hearts' || suit === 'Diamonds') ? 'text-red-600' : 'text-foreground';
 
   if (isFaceDown) {
     return (
@@ -24,6 +23,32 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
       </div>
     );
   }
+
+  if (suit === 'Special') {
+    const Icon = SpecialIcons[rank as keyof typeof SpecialIcons];
+    return (
+      <div
+        className={cn(
+          "aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
+          className
+        )}
+        {...props}
+      >
+        <div className="flex flex-col items-start">
+          <div className="text-xl md:text-2xl font-bold">{value}</div>
+        </div>
+        <div className="self-center">
+            <Icon className="h-10 w-10 md:h-12 md:w-12" />
+        </div>
+        <div className="flex flex-col items-end rotate-180">
+          <div className="text-xl md:text-2xl font-bold">{value}</div>
+        </div>
+      </div>
+    );
+  }
+  
+  const Icon = SuitIcons[suit];
+  const color = (suit === 'Hearts' || suit === 'Diamonds') ? 'text-red-600' : 'text-foreground';
   
   return (
     <div

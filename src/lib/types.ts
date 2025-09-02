@@ -1,6 +1,6 @@
 
-export type Suit = 'Spades' | 'Hearts' | 'Diamonds' | 'Clubs';
-export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
+export type Suit = 'Spades' | 'Hearts' | 'Diamonds' | 'Clubs' | 'Special';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'CL' | 'SB' | 'SH' | 'DE';
 
 export interface Card {
   suit: Suit;
@@ -11,7 +11,7 @@ export type Hand = Card[];
 
 export type EquationTerm = number | string; // e.g., 5, '+', 10
 
-export type GameMode = 'easy' | 'pro';
+export type GameMode = 'easy' | 'pro' | 'special';
 
 export interface Player {
     id: string; // Corresponds to Firebase Auth UID in the future
@@ -24,7 +24,7 @@ export interface Player {
     equation: EquationTerm[];
 }
 
-export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver';
+export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction';
 
 export interface Game {
     id: string;
@@ -41,4 +41,8 @@ export interface Game {
     totalRounds: number;
     roundWinnerIds?: string[];
     nextGameId?: string;
+    specialAction?: {
+        playerId: string;
+        cardRank: 'CL' | 'SB' | 'SH' | 'DE';
+    };
 }
