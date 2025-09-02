@@ -108,7 +108,7 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
 function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
   let currentDeck = [...deck];
   const CARD_VALUES = getCardValues('pro');
-  const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number');
+  const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
   
   const card1Index = Math.floor(Math.random() * numberCards.length);
   const card1 = numberCards[card1Index];
@@ -130,7 +130,7 @@ function generateProTarget(deck: Card[]): { target: number; cardsUsed: Card[], u
 
 
 export function generateTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
-  if (mode === 'pro') {
+  if (mode === 'pro' || mode === 'special') {
     return generateProTarget(deck);
   }
   return generateEasyTarget(deck, mode);
