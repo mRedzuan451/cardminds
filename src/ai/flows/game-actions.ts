@@ -181,8 +181,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     console.log(`[startGame] Found ${playerCount} players.`);
 
     // Write phase
-    const deckCount = playerCount > 4 ? 2 : 1;
-    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
+    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
@@ -402,8 +401,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     const playerCount = players.length;
 
     // Write phase
-    const deckCount = playerCount > 4 ? 2 : 1;
-    let freshDeck = shuffleDeck(createDeck(deckCount, game.gameMode, playerCount));
+    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[nextRound] New target: ${target}.`);
@@ -446,8 +444,8 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
         });
     }
 
-    // Deal starting card to first player
-    if (freshDeck.length > 0) {
+    // Deal starting card to first player, but not in special mode
+    if (game.gameMode !== 'special' && freshDeck.length > 0) {
       const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
       const firstPlayerHand = dealtHands[firstPlayerId];
       if (firstPlayerHand) {
@@ -548,19 +546,21 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         // Find and remove card from hand
         const cardIndex = player.hand.findIndex(c => c.id === card.id);
         if (cardIndex === -1) throw new Error("Card not in hand");
-        const newHand = [...player.hand];
-        newHand.splice(cardIndex, 1);
+        const newHandBeforeShuffle = [...player.hand];
+        newHandBeforeShuffle.splice(cardIndex, 1);
         
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
-            const handToDiscard = [...newHand]; // The hand without the SH card
-            const handSize = player.hand.length; // Original hand size
+            // The entire hand including the shuffle card gets discarded
+            const handToDiscard = [...player.hand]; 
+            const handSize = player.hand.length; 
             
             newDeck.push(...handToDiscard);
             newDeck = shuffleDeck(newDeck);
             
+            // Draw the same number of cards back
             const newCardsForHand = newDeck.splice(0, handSize);
             
             transaction.update(playerRef, { hand: newCardsForHand });
@@ -569,7 +569,7 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             
         } else {
              // For other cards, remove the card and set game state to get more input
-             transaction.update(playerRef, { hand: newHand });
+             transaction.update(playerRef, { hand: newHandBeforeShuffle });
              transaction.update(gameRef, { 
                 gameState: 'specialAction',
                 specialAction: {
@@ -652,3 +652,5 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
+    
