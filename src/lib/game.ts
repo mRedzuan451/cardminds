@@ -35,6 +35,7 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
 
 export function createDeck(mode: GameMode, playerCount: number): Card[] {
     let deck: Card[] = [];
+    // Use 2 decks for 4 or more players
     const deckCount = playerCount >= 4 ? 2 : 1;
 
     // Create the standard card decks
@@ -80,18 +81,24 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
     const CARD_VALUES = getCardValues(mode);
     
     while (result === null || !Number.isInteger(result) || result <= 0 || result > 100) {
-        currentDeck = shuffleDeck(createDeck(mode, 1)); // Create a dummy single deck just for target generation
+        currentDeck = shuffleDeck([...deck]); // Use a shuffled copy of the actual game deck
         
         const numIndex1 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
         if (numIndex1 === -1) continue;
         let numCard1 = currentDeck.splice(numIndex1, 1)[0];
         
         const opIndex = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/' && CARD_VALUES[c.rank] !== '**' && c.suit !== 'Special');
-        if (opIndex === -1) continue;
+        if (opIndex === -1) {
+            currentDeck.push(numCard1); // put card back
+            continue;
+        }
         const opCard = currentDeck.splice(opIndex, 1)[0];
 
         const numIndex2 = currentDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'number');
-        if (numIndex2 === -1) continue;
+        if (numIndex2 === -1) {
+            currentDeck.push(numCard1, opCard); // put cards back
+            continue;
+        }
         let numCard2 = currentDeck.splice(numIndex2, 1)[0];
         
         let term1 = CARD_VALUES[numCard1.rank] as number;
@@ -116,20 +123,23 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
         } catch (e) {
             result = null;
         }
+
+        if (result === null) {
+            // If we failed for any reason, put the cards back in the deck to try again
+             deck.push(...cardsUsed);
+        }
     }
 
-    // After generating the target, remove the used cards from the actual game deck
-    const cardsUsedIds = new Set(cardsUsed.map(c => c.id));
-    const updatedDeck = deck.filter(c => !cardsUsedIds.has(c.id));
-
-    return { target: result, cardsUsed, updatedDeck };
+    // The cards are already removed from currentDeck during the loop
+    return { target: result, cardsUsed, updatedDeck: currentDeck };
 }
 
 function generateProTarget(deck: Card[], mode: GameMode): { target: number; cardsUsed: Card[], updatedDeck: Card[] } {
+  let currentDeck = [...deck];
   const CARD_VALUES = getCardValues(mode);
   
   // Create a temporary list of number cards to choose from for the target
-  const numberCards = deck.filter(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
+  const numberCards = currentDeck.filter(c => typeof CARD_VALUES[c.rank] === 'number' && c.suit !== 'Special');
   
   // If we don't have enough number cards, fall back to easy generation
   if (numberCards.length < 2) {
@@ -140,14 +150,13 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
   const card1Index = Math.floor(Math.random() * numberCards.length);
   let card1 = numberCards[card1Index]; 
   
-  const card2Index = Math.floor(Math.random() * numberCards.length);
+  // Make sure second card is different
+  let card2Index = Math.floor(Math.random() * numberCards.length);
+  while (card2Index === card1Index) {
+      card2Index = Math.floor(Math.random() * numberCards.length);
+  }
   let card2 = numberCards[card2Index];
   
-  if (!card1 || !card2) {
-    // This is a fallback in case something goes wrong, should not be hit
-    return generateEasyTarget(deck, mode);
-  }
-
   const val1 = CARD_VALUES[card1.rank] as number;
   const val2 = CARD_VALUES[card2.rank] as number;
 
@@ -156,7 +165,7 @@ function generateProTarget(deck: Card[], mode: GameMode): { target: number; card
   
   // Now, create the final updated deck by removing ONLY the cards used for the target from the ORIGINAL deck
   const cardsUsedIds = new Set(cardsUsed.map(c => c.id));
-  const updatedDeck = deck.filter(c => !cardsUsedIds.has(c.id));
+  const updatedDeck = currentDeck.filter(c => !cardsUsedIds.has(c.id));
 
   if (isNaN(target)) {
     return generateEasyTarget(deck, mode);
