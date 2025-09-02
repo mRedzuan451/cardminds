@@ -461,7 +461,10 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                   "flex items-center gap-2 text-lg font-bold p-2 rounded-md transition-all",
                   p.id === currentPlayer?.id && "bg-primary/20 scale-105"
                 )}>
-                    <User /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}: <span className="text-primary">{p.totalScore}</span>
+                    <User /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}: 
+                    <span className="text-primary">
+                        {game.gameMode === 'special' ? `${p.totalScore} / ${game.targetScore}` : p.totalScore}
+                    </span>
                 </div>
               ))}
           </CardContent>
