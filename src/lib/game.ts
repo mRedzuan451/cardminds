@@ -85,7 +85,7 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
         if (numIndex1 === -1) continue;
         let numCard1 = tempDeck.splice(numIndex1, 1)[0];
         
-        const opIndex = tempDeck.findIndex(c => typeof CARD_VALUES[c.rank] === 'string' && CARD_VALUES[c.rank] !== '/' && CARD_VALUES[c.rank] !== '**' && c.suit !== 'Special');
+        const opIndex = tempDeck.findIndex(c => CARD_VALUES[c.rank] === '+' || CARD_VALUES[c.rank] === '-');
         if (opIndex === -1) {
             continue;
         }
