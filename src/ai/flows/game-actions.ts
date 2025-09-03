@@ -92,6 +92,7 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
     currentPlayerId: creatorId,
     currentRound: 1,
     totalRounds: 3,
+    targetScore: 0,
   };
   
   const creatorData: Player = {
@@ -564,8 +565,8 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
       targetCards: [],
       currentPlayerId: oldGameData.creatorId,
       currentRound: 1,
-      totalRounds: oldGameData.totalRounds,
-      targetScore: oldGameData.targetScore
+      totalRounds: oldGameData.gameMode === 'special' ? 99 : 3,
+      targetScore: oldGameData.gameMode === 'special' ? 3000 : 0
     };
     
     const batch = writeBatch(db);
