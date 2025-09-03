@@ -125,7 +125,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (game?.lastSpecialCardPlay) {
         if (lastSpecialPlayRef.current?.timestamp !== game.lastSpecialCardPlay.timestamp) {
             const { cardRank, playerName, targetPlayerName } = game.lastSpecialCardPlay;
-            const cardName = CARD_VALUES[cardRank];
+            const cardName = CARD_VALUES[cardRank as Rank];
             let description = `${playerName} played the ${cardName} card!`;
             
             if (cardRank === 'SB' && targetPlayerName) {
@@ -439,7 +439,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         <AlertDialog open={true}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Play {CARD_VALUES[cardRank]} Card</AlertDialogTitle>
+                    <AlertDialogTitle>Play {CARD_VALUES[cardRank as Rank]} Card</AlertDialogTitle>
                 </AlertDialogHeader>
                 {cardRank === 'CL' && (
                     <div>
@@ -840,29 +840,32 @@ const renderDiscardUI = () => {
               Your Hand
             </h2>
             <div className="flex justify-center -space-x-12">
-              {activeHand.map((card, index) => (
-                <div
-                  key={card.id}
-                  className={cn(
-                    "transition-all duration-300 ease-out hover:-translate-y-4",
-                    { "hover:z-20": !usedCardIndices.has(index) }
-                  )}
-                  style={{ zIndex: usedCardIndices.has(index) ? 0 : index }}
-                >
-                  <GameCard
-                    card={card}
-                    mode={game.gameMode}
-                    onClick={() => handleCardClick(card, index)}
+              {activeHand.map((card, index) => {
+                const zIndex = usedCardIndices.has(index) ? 0 : activeHand.length - index;
+                return (
+                  <div
+                    key={card.id}
                     className={cn(
-                      'transition-all duration-200',
-                      {
-                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
-                        "cursor-not-allowed": !isMyTurn
-                      }
+                      "transition-all duration-300 ease-out hover:-translate-y-4",
+                      { "hover:z-20": !usedCardIndices.has(index) }
                     )}
-                  />
-                </div>
-              ))}
+                    style={{ zIndex }}
+                  >
+                    <GameCard
+                      card={card}
+                      mode={game.gameMode}
+                      onClick={() => handleCardClick(card, index)}
+                      className={cn(
+                        'transition-all duration-200',
+                        {
+                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
+                          "cursor-not-allowed": !isMyTurn
+                        }
+                      )}
+                    />
+                  </div>
+                )
+              })}
             </div>
           </div>
       </div>
