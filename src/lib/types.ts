@@ -41,7 +41,7 @@ export interface Game {
     currentPlayerId: string;
     currentRound: number;
     totalRounds: number;
-    targetScore?: number;
+    targetScore: number;
     roundWinnerIds?: string[];
     nextGameId?: string;
     specialAction?: {
@@ -49,4 +49,5 @@ export interface Game {
         cardRank: 'CL' | 'SB' | 'SH' | 'DE';
     };
     discardingPlayerId?: string | null;
+    allowedSpecialCards?: Rank[];
 }

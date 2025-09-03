@@ -10,8 +10,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, updateDoc, runTransaction, arrayUnion, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase';
-import { Game, Player, GameState, GameMode, Card } from '@/lib/types';
-import { createDeck, shuffleDeck, generateTarget, calculateScore, evaluateEquation, getCardValues } from '@/lib/game';
+import { Game, Player, GameState, GameMode, Card, Rank } from '@/lib/types';
+import { createDeck, shuffleDeck, generateTarget, calculateScore, evaluateEquation, getCardValues, SPECIAL_RANKS } from '@/lib/game';
 
 const db = getFirestore(firebaseApp);
 
@@ -33,7 +33,7 @@ const CardSchema = z.object({
 const CreateGameInputSchema = z.object({ creatorName: z.string() });
 const GameIdInputSchema = z.object({ gameId: z.string() });
 const JoinGameInputSchema = z.object({ gameId: z.string(), playerName: z.string() });
-const StartGameInputSchema = z.object({ gameId: z.string(), gameMode: z.enum(['easy', 'pro', 'special']), numberOfPlayers: z.number() });
+const StartGameInputSchema = z.object({ gameId: z.string() });
 const SetGameModeInputSchema = z.object({ gameId: z.string(), mode: z.enum(['easy', 'pro', 'special']) });
 
 const PlayerActionInputSchema = z.object({
@@ -59,6 +59,11 @@ const DiscardCardsInputSchema = z.object({
     gameId: z.string(),
     playerId: z.string(),
     cardsToDiscard: z.array(CardSchema),
+});
+
+const SetAllowedSpecialCardsInputSchema = z.object({
+    gameId: z.string(),
+    allowedCards: z.array(z.string()),
 });
 
 
@@ -93,6 +98,7 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
     currentRound: 1,
     totalRounds: 3,
     targetScore: 0,
+    allowedSpecialCards: SPECIAL_RANKS,
   };
   
   const creatorData: Player = {
@@ -171,7 +177,13 @@ export const setGameMode = ai.defineFlow({ name: 'setGameMode', inputSchema: Set
     console.log(`[setGameMode] Game mode for ${gameId} set to ${mode}`);
 });
 
-export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId, numberOfPlayers }) => {
+export const setAllowedSpecialCards = ai.defineFlow({ name: 'setAllowedSpecialCards', inputSchema: SetAllowedSpecialCardsInputSchema }, async ({ gameId, allowedCards }) => {
+    const gameRef = doc(db, 'games', gameId);
+    await updateDoc(gameRef, { allowedSpecialCards: allowedCards });
+    console.log(`[setAllowedSpecialCards] Updated allowed special cards for game ${gameId}`);
+});
+
+export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId }) => {
   await runTransaction(db, async (transaction) => {
     console.log(`[startGame] Attempting to start game ${gameId}`);
     // Read phase
@@ -188,7 +200,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     console.log(`[startGame] Found ${playerCount} players.`);
 
     // Write phase
-    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount));
+    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount, game.allowedSpecialCards));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
@@ -240,7 +252,7 @@ async function advanceTurn(gameId: string) {
         
         const playersQuery = query(collection(db, 'games', gameId, 'players'));
         const playerDocsSnap = await getDocs(playersQuery);
-let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+        let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
 
         // ========== LOGIC PHASE ==========
         
@@ -260,6 +272,15 @@ let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player)
                 // Update player object in local list for gameOver check
                 p.totalScore = newTotalScore;
             });
+            
+            // Check for game over *after* updating scores for the round
+            if (game.gameMode === 'special' && game.targetScore) {
+                const winner = players.find(p => p.totalScore >= game.targetScore!);
+                if (winner) {
+                    console.log(`[advanceTurn] Game over condition met during round end. Total score: ${winner.totalScore}`);
+                    // Intentionally fall through to roundOver state first. Game over will be set on nextRound click.
+                }
+            }
             
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
@@ -409,7 +430,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     }
 
     // Write phase
-    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount));
+    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount, game.allowedSpecialCards));
     const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
     freshDeck = updatedDeck;
     console.log(`[nextRound] New target: ${target}.`);
@@ -565,7 +586,8 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
       currentPlayerId: oldGameData.creatorId,
       currentRound: 1,
       totalRounds: oldGameData.gameMode === 'special' ? 99 : 3,
-      targetScore: oldGameData.gameMode === 'special' ? 3000 : 0
+      targetScore: oldGameData.gameMode === 'special' ? 3000 : 0,
+      allowedSpecialCards: oldGameData.allowedSpecialCards ?? SPECIAL_RANKS,
     };
     
     const batch = writeBatch(db);
@@ -748,4 +770,3 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
-

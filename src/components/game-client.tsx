@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GameCard } from '@/components/game-card';
 import { useToast } from '@/hooks/use-toast';
-import type { Card as CardType, EquationTerm, GameState, Game, Player } from '@/lib/types';
+import type { Card as CardType, EquationTerm, GameState, Game, Player, Rank } from '@/lib/types';
 import { evaluateEquation, getCardValues, SPECIAL_RANKS } from '@/lib/game';
-import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft, Copy, Sparkles } from 'lucide-react';
+import { RefreshCw, Send, X, Lightbulb, User, LogOut, Trophy, Users, BrainCircuit, Baby, ArrowLeft, Copy, Sparkles, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import {
@@ -27,8 +27,73 @@ import { Label } from './ui/label';
 import { firebaseApp } from '@/lib/firebase';
 import * as gameActions from '@/ai/flows/game-actions';
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from './ui/dialog';
+import { Checkbox } from './ui/checkbox';
 
 const db = getFirestore(firebaseApp);
+
+
+function SpecialCardConfig({ game, onSave, onCancel }: { game: Game, onSave: (allowed: Rank[]) => void, onCancel: () => void }) {
+    const [selectedCards, setSelectedCards] = useState<Set<Rank>>(new Set(game.allowedSpecialCards ?? SPECIAL_RANKS));
+    const CARD_VALUES = getCardValues('special');
+
+    const handleToggle = (rank: Rank) => {
+        const newSelection = new Set(selectedCards);
+        if (newSelection.has(rank)) {
+            newSelection.delete(rank);
+        } else {
+            newSelection.add(rank);
+        }
+        setSelectedCards(newSelection);
+    };
+
+    const handleSave = () => {
+        onSave(Array.from(selectedCards));
+    };
+
+    return (
+        <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle className="font-headline text-2xl">Configure Special Cards</DialogTitle>
+                    <DialogDescription>
+                        Select which special cards will be included in the deck for this game.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+                    {SPECIAL_RANKS.map(rank => (
+                        <div key={rank} className="flex flex-col items-center gap-2">
+                             <GameCard
+                                card={{ id: rank, suit: 'Special', rank }}
+                                mode="special"
+                                onClick={() => handleToggle(rank)}
+                                className={cn(!selectedCards.has(rank) && "opacity-50 grayscale")}
+                            />
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`check-${rank}`}
+                                    checked={selectedCards.has(rank)}
+                                    onCheckedChange={() => handleToggle(rank)}
+                                />
+                                <label
+                                    htmlFor={`check-${rank}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                    {CARD_VALUES[rank]}
+                                </label>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+                    <Button onClick={handleSave}>Save Configuration</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export default function GameClient({ gameId, playerName }: { gameId: string, playerName: string }) {
   const [gameDoc, loading, error] = useDocument(doc(db, 'games', gameId));
@@ -42,6 +107,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [isRematching, setIsRematching] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [selectedToDiscard, setSelectedToDiscard] = useState<Set<string>>(new Set());
+  const [isSpecialConfigOpen, setIsSpecialConfigOpen] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -175,22 +241,12 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!isMyTurn || !localPlayer || !game) return;
 
     if (game.gameMode === 'easy') {
-        // Allow single number submission
         if (equation.length === 1) {
             if (typeof equation[0] !== 'number') {
                 toast({ title: "Invalid Submission", description: "If you submit one card, it must be a number.", variant: 'destructive'});
                 return;
             }
         } else if (equation.length > 1) {
-            // Rules for multi-card equations
-            if (equation.length < 3) {
-                toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
-                return;
-            }
-            if (equation.filter(term => typeof term === 'string').length === 0) {
-                toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
-                return;
-            }
             if (typeof equation[equation.length - 1] !== 'number') {
                 toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
                 return;
@@ -231,14 +287,25 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
        toast({ title: "Only the creator can start the game", variant: 'destructive' });
        return;
     }
-    await gameActions.startGame({ gameId, gameMode: game.gameMode, numberOfPlayers: game.players.length });
+    await gameActions.startGame({ gameId });
   };
   
   const handleSetGameMode = async (mode: 'easy' | 'pro' | 'special') => {
     if (game?.creatorId === localPlayer?.id) {
-        await gameActions.setGameMode({gameId, mode});
+        if (mode === 'special') {
+            setIsSpecialConfigOpen(true);
+        } else {
+            await gameActions.setGameMode({gameId, mode});
+        }
     }
   }
+
+  const handleSaveSpecialConfig = async (allowedCards: Rank[]) => {
+    await gameActions.setAllowedSpecialCards({ gameId, allowedCards });
+    await gameActions.setGameMode({ gameId, mode: 'special' });
+    setIsSpecialConfigOpen(false);
+    toast({ title: "Special Mode Configured!", description: "The special cards for this game have been set." });
+  };
 
   const totalWinner = useMemo(() => {
     if (game?.gameState !== 'gameOver' || !players) return [];
@@ -454,7 +521,7 @@ const renderDiscardUI = () => {
       if (game.gameMode === 'special' && game.targetScore) {
           return players.some(p => p.totalScore >= game.targetScore!);
       }
-      return game.currentRound >= game.totalRounds;
+      return game.gameMode !== 'special' && game.currentRound >= game.totalRounds;
   }, [game, players]);
   
   if (loading || !game || !players || !localPlayer) {
@@ -471,6 +538,13 @@ const renderDiscardUI = () => {
   if (game.gameState === 'lobby') {
     return (
       <div className="container mx-auto p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-150px)]">
+        {isSpecialConfigOpen && localPlayer.id === game.creatorId && (
+            <SpecialCardConfig
+                game={game}
+                onSave={handleSaveSpecialConfig}
+                onCancel={() => setIsSpecialConfigOpen(false)}
+            />
+        )}
         <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95 w-full max-w-lg">
           <CardHeader>
             <CardTitle className="text-4xl font-headline">Game Lobby</CardTitle>
@@ -510,15 +584,22 @@ const renderDiscardUI = () => {
                     <BrainCircuit className="mr-4 h-8 w-8" />
                     Pro
                   </Button>
-                   <Button
-                    onClick={() => handleSetGameMode('special')}
-                    size="lg"
-                    variant={game.gameMode === 'special' ? 'default' : 'outline'}
-                    className="h-24 text-2xl border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
-                  >
-                    <Sparkles className="mr-4 h-8 w-8" />
-                    Special
-                  </Button>
+                   <div className="relative">
+                    <Button
+                        onClick={() => handleSetGameMode('special')}
+                        size="lg"
+                        variant={game.gameMode === 'special' ? 'default' : 'outline'}
+                        className="h-24 text-2xl w-full border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
+                    >
+                        <Sparkles className="mr-4 h-8 w-8" />
+                        Special
+                    </Button>
+                    {game.gameMode === 'special' && (
+                        <Button onClick={() => setIsSpecialConfigOpen(true)} size="icon" className="absolute -top-2 -right-2 h-8 w-8 rounded-full">
+                            <Settings className="h-5 w-5" />
+                        </Button>
+                    )}
+                   </div>
                 </div>
               </div>
             )}

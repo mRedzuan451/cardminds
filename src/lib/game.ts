@@ -33,7 +33,7 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
     return EASY_CARD_VALUES;
 }
 
-export function createDeck(mode: GameMode, playerCount: number): Card[] {
+export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRanks: Rank[] = SPECIAL_RANKS): Card[] {
     const deck: Card[] = [];
     const deckCount = playerCount >= 4 ? 2 : 1;
 
@@ -48,7 +48,7 @@ export function createDeck(mode: GameMode, playerCount: number): Card[] {
     if (mode === 'special') {
         const specialDecks = playerCount >= 4 ? 2 : 1;
         for (let i = 0; i < specialDecks; i++) {
-            for (const rank of SPECIAL_RANKS) {
+            for (const rank of allowedSpecialRanks) {
                 // Add two of each special card per deck
                 deck.push({ id: `deck-${i}-special-${rank}-1`, suit: 'Special', rank });
                 deck.push({ id: `deck-${i}-special-${rank}-2`, suit: 'Special', rank });
@@ -189,6 +189,22 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
     if (mode === 'easy' && equation.length === 1 && typeof equation[0] === 'number') {
         return equation[0];
     }
+    if (mode === 'easy') {
+         if (equation.length < 3) {
+            return { error: "An equation must have at least 3 terms." };
+         }
+         for(let i=0; i<equation.length; i++) {
+            const term = equation[i];
+            const isEven = i % 2 === 0;
+            if (isEven && typeof term !== 'number') {
+                 return { error: `Invalid syntax. Expected a number at position ${i+1}.`};
+            }
+            if (!isEven && typeof term !== 'string') {
+                return { error: `Invalid syntax. Expected an operator at position ${i+1}.`};
+            }
+         }
+    }
+
 
     let terms = [...equation];
 
@@ -211,18 +227,42 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
             terms = newTerms;
         }
 
-        // Handle Power of 2 (**) as a unary operator applied to the preceding number
+        // Handle Power of 2 (**) as a unary operator applied to the preceding number/group
         let powerProcessedTerms: EquationTerm[] = [];
-        for (let i = 0; i < terms.length; i++) {
+        let i = 0;
+        while (i < terms.length) {
             if (terms[i] === '**') {
                 const base = powerProcessedTerms.pop();
-                if (typeof base !== 'number') {
-                    // This handles cases like `** 2` or `+ **`
-                    return { error: "Power operator must follow a number." };
+
+                if (base === ')') {
+                    let parenCount = 1;
+                    const expressionInParen: EquationTerm[] = [')'];
+                    while(parenCount > 0 && powerProcessedTerms.length > 0) {
+                        const popped = powerProcessedTerms.pop();
+                        expressionInParen.unshift(popped!);
+                        if (popped === '(') parenCount--;
+                        if (popped === ')') parenCount++;
+                    }
+                     if (parenCount !== 0) {
+                        return { error: "Mismatched parentheses with power operator." };
+                    }
+                    const subExpression = expressionInParen.slice(1, -1);
+                    const subResult = evaluateEquation(subExpression, mode);
+                    if (typeof subResult === 'object' && subResult.error) {
+                        return subResult;
+                    }
+                    powerProcessedTerms.push(Math.pow(subResult as number, 2));
+
+                } else if (typeof base === 'number') {
+                    powerProcessedTerms.push(Math.pow(base, 2));
                 }
-                powerProcessedTerms.push(Math.pow(base, 2));
+                else {
+                    return { error: "Power operator must follow a number or a group." };
+                }
+                i++;
             } else {
                 powerProcessedTerms.push(terms[i]);
+                i++;
             }
         }
         terms = powerProcessedTerms;
