@@ -722,13 +722,13 @@ const renderDiscardUI = () => {
               <User />
               Your Hand
             </h2>
-            <div className="flex justify-center -space-x-16">
+            <div className="flex justify-center -space-x-12">
               {activeHand.map((card, index) => (
                 <div
                   key={card.id}
                   className={cn(
                     "transition-all duration-300 ease-out hover:-translate-y-4",
-                    { "z-0": usedCardIndices.has(index), "hover:z-20": !usedCardIndices.has(index) }
+                    { "hover:z-20": !usedCardIndices.has(index) }
                   )}
                   style={{ zIndex: usedCardIndices.has(index) ? 0 : index }}
                 >
