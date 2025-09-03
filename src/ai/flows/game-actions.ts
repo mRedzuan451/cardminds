@@ -228,7 +228,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
         }
     }
     
-    console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck);
+    console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck.map(c => c.id));
 
     transaction.update(gameRef, {
         gameState: 'playerTurn',
@@ -252,7 +252,7 @@ async function advanceTurn(gameId: string) {
         if (!gameDoc.exists()) throw new Error("Game not found");
         let game = gameDoc.data() as Game;
         
-        console.log(`[DEBUG] Deck at start of advanceTurn for game ${gameId}:`, game.deck);
+        console.log(`[DEBUG] Deck at start of advanceTurn for game ${gameId}:`, game.deck.map(c => c.id));
         
         const playersQuery = query(collection(db, 'games', gameId, 'players'));
         const playerDocsSnap = await getDocs(playersQuery);
@@ -281,30 +281,12 @@ async function advanceTurn(gameId: string) {
             const winners = players.filter(p => p.roundScore === highestScore);
             const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
             
-             // Check for game over conditions first
-            let isGameOver = false;
-            if (game.gameMode === 'special' && game.targetScore) {
-                const winner = players.find(p => p.totalScore >= game.targetScore!);
-                if (winner) {
-                    console.log(`[advanceTurn] Game over! ${winner.name} reached the target score.`);
-                    isGameOver = true;
-                }
-            }
-            if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
-                console.log(`[advanceTurn] Game over by rounds.`);
-                isGameOver = true;
-            }
-
-            if (isGameOver) {
-                transaction.update(gameRef, { gameState: 'gameOver', roundWinnerIds });
-            } else {
-                 transaction.update(gameRef, {
-                    gameState: 'roundOver',
-                    roundWinnerIds,
-                });
-            }
+            transaction.update(gameRef, {
+                gameState: 'roundOver',
+                roundWinnerIds,
+            });
            
-            console.log(`[advanceTurn] Game state set to '${isGameOver ? 'gameOver' : 'roundOver'}'. Winners:`, winners.map(w => w.name));
+            console.log(`[advanceTurn] Game state set to 'roundOver'. Winners:`, winners.map(w => w.name));
             return; // End the transaction, round is over.
         }
 
@@ -337,7 +319,7 @@ async function advanceTurn(gameId: string) {
                 transaction.update(nextPlayerRef, { hand: newHand });
                 console.log(`[advanceTurn] Dealt card ${newCard.rank} of ${newCard.suit} to ${nextPlayerId}.`);
             }
-            console.log(`[DEBUG] Deck after dealing card in advanceTurn for game ${gameId}:`, newDeck);
+            console.log(`[DEBUG] Deck after dealing card in advanceTurn for game ${gameId}:`, newDeck.map(c => c.id));
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
         } else {
              // This case should be handled by the allPlayersHaveActed check, but as a fallback.
@@ -504,7 +486,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       }
     }
 
-    console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck);
+    console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck.map(c => c.id));
     
     // Determine next game state
     if (playerToDiscard) {
@@ -651,20 +633,13 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
-            let newDeck = [...game.deck];
-            // The entire hand, excluding the shuffle card itself, is returned to the deck
+            // The Shuffle card is consumed, and the rest of the hand is shuffled.
             const handToShuffle = player.hand.filter(c => c.id !== card.id);
-            const handSizeAfterShuffleCard = player.hand.length - 1; // We draw back this many cards
+            const shuffledHand = shuffleDeck(handToShuffle);
             
-            newDeck.push(...handToShuffle);
-            newDeck = shuffleDeck(newDeck);
-            
-            // Draw the same number of cards back
-            const newCardsForHand = newDeck.splice(0, handSizeAfterShuffleCard);
-            
-            transaction.update(playerRef, { hand: newCardsForHand });
+            transaction.update(playerRef, { hand: shuffledHand });
             transaction.update(gameRef, {
-                deck: newDeck,
+                // The deck is not modified, only the player's hand.
                 lastSpecialCardPlay: {
                     cardRank: 'SH',
                     playerName: player.name,
@@ -690,7 +665,7 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
 });
 
 export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', inputSchema: SpecialActionInputSchema }, async ({ gameId, playerId, card, target }) => {
-    let turnShouldAdvance = true;
+    let turnShouldAdvance = false;
 
     await runTransaction(db, async (transaction) => {
         const gameRef = doc(db, 'games', gameId);
@@ -819,5 +794,3 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
-
-    
