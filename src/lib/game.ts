@@ -213,15 +213,18 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
         if (mode === 'pro' || mode === 'special') {
             const newTerms: EquationTerm[] = [];
             for (let i = 0; i < terms.length; i++) {
+                newTerms.push(terms[i]);
                 const currentTerm = terms[i];
                 const nextTerm = terms[i + 1];
-                newTerms.push(currentTerm);
-                if (
-                    (typeof currentTerm === 'number' && nextTerm === '(') ||
-                    (currentTerm === ')' && typeof nextTerm === 'number') ||
-                    (currentTerm === ')' && nextTerm === '(')
-                ) {
-                    newTerms.push('*');
+
+                if (nextTerm) {
+                    if (
+                        (typeof currentTerm === 'number' && nextTerm === '(') ||
+                        (currentTerm === ')' && typeof nextTerm === 'number') ||
+                        (currentTerm === ')' && nextTerm === '(')
+                    ) {
+                        newTerms.push('*');
+                    }
                 }
             }
             terms = newTerms;
@@ -314,3 +317,5 @@ export function calculateScore(result: number, target: number, cardsUsed: number
   const score = Math.max(0, 500 - (difference * 10) - (cardsUsed * 20));
   return Math.round(score);
 }
+
+    
