@@ -260,16 +260,6 @@ let players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player)
                 // Update player object in local list for gameOver check
                 p.totalScore = newTotalScore;
             });
-
-            // Check for game over condition
-            if (game.gameMode === 'special' && game.targetScore) {
-                const winner = players.find(p => p.totalScore >= game.targetScore!);
-                if (winner) {
-                    transaction.update(gameRef, { gameState: 'gameOver' });
-                    console.log(`[advanceTurn] Game over! ${winner.name} reached the target score.`);
-                    return; // End transaction
-                }
-            }
             
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
@@ -398,16 +388,25 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
     if (!gameDoc.exists()) throw new Error("Game not found");
     let game = gameDoc.data() as Game;
     
-    if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
-      console.log(`[nextRound] Game over by rounds. Setting state to 'gameOver'.`);
-      transaction.update(gameRef, { gameState: 'gameOver' });
-      return;
-    }
-    
     const playersQuery = query(collection(db, 'games', gameId, 'players'));
     const playerDocsSnap = await getDocs(playersQuery);
     const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
     const playerCount = players.length;
+    
+    // Check for game over conditions first
+    if (game.gameMode === 'special' && game.targetScore) {
+        const winner = players.find(p => p.totalScore >= game.targetScore!);
+        if (winner) {
+            console.log(`[nextRound] Game over! ${winner.name} reached the target score.`);
+            transaction.update(gameRef, { gameState: 'gameOver' });
+            return;
+        }
+    }
+    if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
+        console.log(`[nextRound] Game over by rounds. Setting state to 'gameOver'.`);
+        transaction.update(gameRef, { gameState: 'gameOver' });
+        return;
+    }
 
     // Write phase
     let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount));

@@ -449,6 +449,14 @@ const renderDiscardUI = () => {
     return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winners[0].name} Wins This Round!</p>;
   };
   
+  const isGameOver = useMemo(() => {
+      if (!game || !players) return false;
+      if (game.gameMode === 'special' && game.targetScore) {
+          return players.some(p => p.totalScore >= game.targetScore!);
+      }
+      return game.currentRound >= game.totalRounds;
+  }, [game, players]);
+  
   if (loading || !game || !players || !localPlayer) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -711,7 +719,7 @@ const renderDiscardUI = () => {
             ))}
           </div>
           <Button onClick={handleNextRound} size="lg" className="mt-8" disabled={game.creatorId !== localPlayer.id}>
-            {game.currentRound >= game.totalRounds ? 'Show Final Results' : 'Next Round'}
+            { isGameOver ? 'Show Final Results' : 'Next Round' }
           </Button>
         </Card>
       )}
