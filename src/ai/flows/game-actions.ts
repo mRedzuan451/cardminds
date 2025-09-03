@@ -690,6 +690,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                     transaction.update(targetPlayerRef, { hand: targetHand });
                     transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
                 }
+                turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
             case 'DE': { // Destiny Card
@@ -747,3 +748,4 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
