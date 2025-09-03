@@ -546,6 +546,7 @@ const renderDiscardUI = () => {
   
   const isGameOver = useMemo(() => {
       if (!game || !players) return false;
+      if (game.gameState === 'gameOver') return true;
       if (game.gameMode === 'special' && game.targetScore) {
           return players.some(p => p.totalScore >= game.targetScore!);
       }
@@ -841,7 +842,7 @@ const renderDiscardUI = () => {
             </h2>
             <div className="flex justify-center -space-x-12">
               {activeHand.map((card, index) => {
-                const zIndex = usedCardIndices.has(index) ? 0 : activeHand.length - index;
+                const zIndex = activeHand.length - index;
                 return (
                   <div
                     key={card.id}
@@ -872,3 +873,5 @@ const renderDiscardUI = () => {
     </div>
   );
 }
+
+    
