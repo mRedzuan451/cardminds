@@ -227,6 +227,8 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
             console.log(`[startGame] Dealt starting card to first player ${firstPlayerId}.`);
         }
     }
+    
+    console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck);
 
     transaction.update(gameRef, {
         gameState: 'playerTurn',
@@ -249,6 +251,8 @@ async function advanceTurn(gameId: string) {
         const gameDoc = await transaction.get(gameRef);
         if (!gameDoc.exists()) throw new Error("Game not found");
         let game = gameDoc.data() as Game;
+        
+        console.log(`[DEBUG] Deck at start of advanceTurn for game ${gameId}:`, game.deck);
         
         const playersQuery = query(collection(db, 'games', gameId, 'players'));
         const playerDocsSnap = await getDocs(playersQuery);
@@ -276,12 +280,31 @@ async function advanceTurn(gameId: string) {
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
+            
+             // Check for game over conditions first
+            let isGameOver = false;
+            if (game.gameMode === 'special' && game.targetScore) {
+                const winner = players.find(p => p.totalScore >= game.targetScore!);
+                if (winner) {
+                    console.log(`[advanceTurn] Game over! ${winner.name} reached the target score.`);
+                    isGameOver = true;
+                }
+            }
+            if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
+                console.log(`[advanceTurn] Game over by rounds.`);
+                isGameOver = true;
+            }
 
-            transaction.update(gameRef, {
-                gameState: 'roundOver',
-                roundWinnerIds,
-            });
-            console.log(`[advanceTurn] Game state set to 'roundOver'. Winners:`, winners.map(w => w.name));
+            if (isGameOver) {
+                transaction.update(gameRef, { gameState: 'gameOver', roundWinnerIds });
+            } else {
+                 transaction.update(gameRef, {
+                    gameState: 'roundOver',
+                    roundWinnerIds,
+                });
+            }
+           
+            console.log(`[advanceTurn] Game state set to '${isGameOver ? 'gameOver' : 'roundOver'}'. Winners:`, winners.map(w => w.name));
             return; // End the transaction, round is over.
         }
 
@@ -314,6 +337,7 @@ async function advanceTurn(gameId: string) {
                 transaction.update(nextPlayerRef, { hand: newHand });
                 console.log(`[advanceTurn] Dealt card ${newCard.rank} of ${newCard.suit} to ${nextPlayerId}.`);
             }
+            console.log(`[DEBUG] Deck after dealing card in advanceTurn for game ${gameId}:`, newDeck);
             transaction.update(gameRef, { currentPlayerId: nextPlayerId, deck: newDeck });
         } else {
              // This case should be handled by the allPlayersHaveActed check, but as a fallback.
@@ -479,6 +503,8 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
           console.log(`[nextRound] Dealt starting card to first player ${firstPlayerId}.`);
       }
     }
+
+    console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck);
     
     // Determine next game state
     if (playerToDiscard) {
@@ -793,3 +819,5 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
+    
