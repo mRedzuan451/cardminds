@@ -181,7 +181,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 toast({ title: "Invalid Submission", description: "If you submit one card, it must be a number.", variant: 'destructive'});
                 return;
             }
-        } else {
+        } else if (equation.length > 1) {
             // Rules for multi-card equations
             if (equation.length < 3) {
                 toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
@@ -534,7 +534,6 @@ const renderDiscardUI = () => {
       {renderSpecialActionUI()}
       {renderDiscardUI()}
 
-      {/* Action Buttons - Top on mobile, right on desktop */}
       <div className="w-full md:hidden flex flex-col md:flex-row gap-2">
         <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
           <RefreshCw className="mr-2 h-5 w-5"/> New Game
@@ -545,7 +544,6 @@ const renderDiscardUI = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-        {/* Column 1: Scoreboard */}
         <Card className="text-center p-4 shadow-lg w-full md:col-span-1">
           <CardHeader className="p-0 mb-2">
             <CardTitle className="text-lg text-muted-foreground font-headline">
@@ -567,7 +565,6 @@ const renderDiscardUI = () => {
           </CardContent>
         </Card>
         
-        {/* Column 2: Target & Turn Indicator */}
         <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
             <Card className="text-center p-4 shadow-lg w-full">
               <CardHeader className="p-0 mb-1">
@@ -583,7 +580,6 @@ const renderDiscardUI = () => {
             </Card>
         </div>
 
-        {/* Column 3: Actions - Hidden on mobile */}
         <div className="w-full md:col-span-1 hidden md:flex flex-col items-center justify-center gap-4">
             <div className="flex flex-col md:flex-row gap-2 w-full">
               <Button onClick={handleNewGameClick} size="lg" className="shadow-lg flex-grow">
@@ -728,7 +724,14 @@ const renderDiscardUI = () => {
             </h2>
             <div className="flex justify-center -space-x-12 md:-space-x-16">
               {activeHand.map((card, index) => (
-                <div key={card.id} className="transition-all duration-300 ease-out hover:-translate-y-4 hover:z-20">
+                <div 
+                  key={card.id} 
+                  className={cn(
+                      "transition-all duration-300 ease-out hover:-translate-y-4",
+                      usedCardIndices.has(index) ? 'z-0' : 'z-10 hover:z-20'
+                  )}
+                  style={{ zIndex: usedCardIndices.has(index) ? 0 : activeHand.length - index }}
+                  >
                   <GameCard
                     card={card}
                     mode={game.gameMode}
@@ -747,3 +750,5 @@ const renderDiscardUI = () => {
     </div>
   );
 }
+
+    
