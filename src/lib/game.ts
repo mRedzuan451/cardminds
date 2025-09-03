@@ -46,14 +46,16 @@ export function createDeck(mode: GameMode, playerCount: number): Card[] {
     }
 
     if (mode === 'special') {
-        for (let i = 0; i < deckCount; i++) {
+        const specialDecks = playerCount >= 4 ? 2 : 1;
+        for (let i = 0; i < specialDecks; i++) {
             for (const rank of SPECIAL_RANKS) {
+                // Add two of each special card per deck
                 deck.push({ id: `deck-${i}-special-${rank}-1`, suit: 'Special', rank });
                 deck.push({ id: `deck-${i}-special-${rank}-2`, suit: 'Special', rank });
             }
         }
     }
-
+    
     return deck;
 }
 
@@ -104,12 +106,13 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
             [term1, term3] = [term3, term1];
         }
         
-        cardsUsed = [numCard1, opCard, numCard2];
+        const tempCardsUsed = [numCard1, opCard, numCard2];
         const equation = [term1, operator, term3];
         const evalResult = evaluateEquation(equation, 'easy');
 
-        if (typeof evalResult === 'number') {
+        if (typeof evalResult === 'number' && evalResult > 0 && evalResult <= 100 && Number.isInteger(evalResult)) {
             result = evalResult;
+            cardsUsed = tempCardsUsed;
             // If we found a valid result, update the main deck
             const cardsUsedIds = new Set(cardsUsed.map(c => c.id));
             currentDeck = deck.filter(c => !cardsUsedIds.has(c.id));
@@ -118,7 +121,7 @@ function generateEasyTarget(deck: Card[], mode: GameMode): { target: number; car
         }
     }
     
-    if (result === null) {
+    if (result === null || cardsUsed.length === 0) {
       // Fallback if no suitable target could be generated
       console.warn("[generateEasyTarget] Could not generate a valid target. Defaulting to 10.");
       return { target: 10, cardsUsed: [], updatedDeck: deck };
@@ -183,10 +186,14 @@ export function generateTarget(deck: Card[], mode: GameMode, playerCount: number
 export function evaluateEquation(equation: EquationTerm[], mode: GameMode): number | { error: string } {
     if (equation.length === 0) return { error: "Equation is empty." };
 
+    if (mode === 'easy' && equation.length === 1 && typeof equation[0] === 'number') {
+        return equation[0];
+    }
+
     let terms = [...equation];
 
     try {
-        // Auto-insert multiplication for Pro/Special modes
+        // Auto-insert multiplication for Pro/Special modes where numbers are next to parentheses
         if (mode === 'pro' || mode === 'special') {
             const newTerms: EquationTerm[] = [];
             for (let i = 0; i < terms.length; i++) {
@@ -204,33 +211,41 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
             terms = newTerms;
         }
 
-        // Handle Power of 2 (**) immediately (highest precedence)
-        let powerTerms: EquationTerm[] = [];
-        for(let i = 0; i < terms.length; i++) {
+        // Handle Power of 2 (**) as a unary operator applied to the preceding number
+        let powerProcessedTerms: EquationTerm[] = [];
+        for (let i = 0; i < terms.length; i++) {
             if (terms[i] === '**') {
-                const base = powerTerms.pop();
-                if (typeof base !== 'number') throw new Error("Power operator must follow a number.");
-                powerTerms.push(Math.pow(base, 2));
+                const base = powerProcessedTerms.pop();
+                if (typeof base !== 'number') {
+                    // This handles cases like `** 2` or `+ **`
+                    return { error: "Power operator must follow a number." };
+                }
+                powerProcessedTerms.push(Math.pow(base, 2));
             } else {
-                powerTerms.push(terms[i]);
+                powerProcessedTerms.push(terms[i]);
             }
         }
-        terms = powerTerms;
+        terms = powerProcessedTerms;
 
+        const expression = terms.join(' ').replace(/\s{2,}/g, ' ');
 
-        const expression = terms.join(' ');
-        
         // Final validation before eval
         const openParen = (expression.match(/\(/g) || []).length;
         const closeParen = (expression.match(/\)/g) || []).length;
         if (openParen !== closeParen) {
             return { error: 'Mismatched parentheses.' };
         }
+        // Allows numbers, parentheses, and the basic operators.
         if (/[^0-9\s()+\-*/.]/.test(expression)) {
-            return { error: 'Invalid characters in equation.'}
+            return { error: 'Invalid characters in equation.'};
         }
-        if (/[\+\-\*\/][\+\-\*\/]/.test(expression)) {
+        // Prevents things like `5 * * 2`
+        if (/[\+\-\*\/]\s*[\+\-\*\/]/.test(expression)) {
             return { error: 'Consecutive operators are not allowed.' };
+        }
+        // Prevents empty parentheses `()` or `( )`
+        if (/\(\s*\)/.test(expression)) {
+            return { error: 'Empty parentheses are not allowed.' };
         }
 
 
@@ -244,7 +259,8 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
         return result;
 
     } catch (e: any) {
-        return { error: e.message || 'Invalid mathematical expression.' };
+        console.error("Equation evaluation error:", e);
+        return { error: 'Invalid mathematical expression.' };
     }
 }
 
