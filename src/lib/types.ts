@@ -50,4 +50,10 @@ export interface Game {
     };
     discardingPlayerId?: string | null;
     allowedSpecialCards?: Rank[];
+    lastSpecialCardPlay?: {
+        cardRank: 'CL' | 'SB' | 'SH' | 'DE';
+        playerName: string;
+        targetPlayerName?: string;
+        timestamp: number;
+    } | null;
 }

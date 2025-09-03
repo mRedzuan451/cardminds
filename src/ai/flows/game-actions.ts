@@ -648,7 +648,14 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             const newCardsForHand = newDeck.splice(0, handSize);
             
             transaction.update(playerRef, { hand: newCardsForHand });
-            transaction.update(gameRef, { deck: newDeck });
+            transaction.update(gameRef, {
+                deck: newDeck,
+                lastSpecialCardPlay: {
+                    cardRank: 'SH',
+                    playerName: player.name,
+                    timestamp: Date.now(),
+                }
+            });
             // The turn does not advance here. The player can now make a move.
             
         } else {
@@ -675,6 +682,13 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
         const game = gameDoc.data() as Game;
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
+        const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
+        const actingPlayerDoc = await transaction.get(actingPlayerRef);
+        if (!actingPlayerDoc.exists()) throw new Error("Acting player not found");
+        const actingPlayer = actingPlayerDoc.data() as Player;
+
+        let lastPlayUpdate: Partial<Game> = {};
+
         switch(cardRank) {
             case 'CL': { // Clone Card
                 const playerRef = doc(db, 'games', gameId, 'players', playerId);
@@ -684,22 +698,23 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const clonedCard = { ...(target as Card), id: `cloned-${Date.now()}` };
                 const newHand = [...player.hand, clonedCard];
                 transaction.update(playerRef, { hand: newHand });
+                
+                lastPlayUpdate.lastSpecialCardPlay = {
+                    cardRank: 'CL',
+                    playerName: actingPlayer.name,
+                    timestamp: Date.now(),
+                };
                 turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
             case 'SB': { // Sabotage Card
-                const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
                 const targetPlayerId = target as string;
                 const targetPlayerRef = doc(db, 'games', gameId, 'players', targetPlayerId);
 
-                const [actingPlayerDoc, targetPlayerDoc] = await Promise.all([
-                    transaction.get(actingPlayerRef),
-                    transaction.get(targetPlayerRef)
-                ]);
+                const targetPlayerDoc = await transaction.get(targetPlayerRef);
 
-                if (!actingPlayerDoc.exists() || !targetPlayerDoc.exists()) throw new Error("Player not found");
+                if (!targetPlayerDoc.exists()) throw new Error("Target player not found");
                 
-                const actingPlayer = actingPlayerDoc.data() as Player;
                 const targetPlayer = targetPlayerDoc.data() as Player;
                 const targetHand = [...targetPlayer.hand];
 
@@ -712,6 +727,13 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                     transaction.update(targetPlayerRef, { hand: targetHand });
                     transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
                 }
+                
+                lastPlayUpdate.lastSpecialCardPlay = {
+                    cardRank: 'SB',
+                    playerName: actingPlayer.name,
+                    targetPlayerName: targetPlayer.name,
+                    timestamp: Date.now(),
+                };
                 turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
@@ -740,19 +762,25 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                     throw new Error("Destiny card created an invalid target number.");
                 }
 
-                transaction.update(gameRef, {
+                lastPlayUpdate = {
                     targetCards: newTargetCards,
                     targetNumber: newTargetNumber,
-                    deck: newDeck
-                });
+                    deck: newDeck,
+                    lastSpecialCardPlay: {
+                        cardRank: 'DE',
+                        playerName: actingPlayer.name,
+                        timestamp: Date.now(),
+                    }
+                };
                 turnShouldAdvance = false; // Player does not pass their turn
                 break;
             }
         }
+        
+        transaction.update(gameRef, lastPlayUpdate);
 
         // For cards that end the turn, mark the player as having passed.
         if (turnShouldAdvance) {
-            const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
             transaction.update(actingPlayerRef, { passed: true });
         }
     });

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDocument, useCollection } from 'react-firebase-hooks/firestore';
 import { doc, collection, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -116,8 +116,36 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const players = useMemo(() => playersCollection?.docs.map(d => ({...d.data(), id: d.id})) as Player[] | undefined, [playersCollection]);
 
   const localPlayer = useMemo(() => players?.find(p => p.name === localPlayerName), [players, localPlayerName]);
+  const lastSpecialPlayRef = useRef(game?.lastSpecialCardPlay);
+
 
   const CARD_VALUES = useMemo(() => getCardValues(game?.gameMode ?? 'easy'), [game?.gameMode]);
+  
+  useEffect(() => {
+    if (game?.lastSpecialCardPlay) {
+        if (lastSpecialPlayRef.current?.timestamp !== game.lastSpecialCardPlay.timestamp) {
+            const { cardRank, playerName, targetPlayerName } = game.lastSpecialCardPlay;
+            const cardName = CARD_VALUES[cardRank];
+            let description = `${playerName} played the ${cardName} card!`;
+            
+            if (cardRank === 'SB' && targetPlayerName) {
+                description = `${playerName} used ${cardName} on ${targetPlayerName}!`;
+            } else if (cardRank === 'SH') {
+                description = `${playerName} used the ${cardName} card and shuffled their hand!`;
+            } else if (cardRank === 'CL') {
+                 description = `${playerName} used the ${cardName} card to clone a card!`;
+            } else if (cardRank === 'DE') {
+                description = `${playerName} used the ${cardName} card to change the target!`;
+            }
+
+            toast({
+                title: 'Special Card Played!',
+                description: description,
+            });
+        }
+        lastSpecialPlayRef.current = game.lastSpecialCardPlay;
+    }
+}, [game?.lastSpecialCardPlay, toast, CARD_VALUES]);
 
   useEffect(() => {
     if (game?.nextGameId) {
