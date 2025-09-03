@@ -842,7 +842,7 @@ const renderDiscardUI = () => {
               <User />
               Your Hand
             </h2>
-            <div className="flex justify-center -space-x-16">
+            <div className="flex justify-center -space-x-12">
               {activeHand.map((card, index) => (
                 <div
                   key={card.id}
@@ -872,3 +872,5 @@ const renderDiscardUI = () => {
     </div>
   );
 }
+
+    
