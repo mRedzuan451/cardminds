@@ -285,7 +285,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     const result = evaluateEquation(equation, game.gameMode);
 
     if (typeof result === 'object' && result.error) {
-        toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
+        if (game.gameMode === 'special') {
+            toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
+        }
         return;
     }
 
@@ -840,38 +842,33 @@ const renderDiscardUI = () => {
               <User />
               Your Hand
             </h2>
-            <div className="flex justify-center -space-x-12">
-              {activeHand.map((card, index) => {
-                const zIndex = activeHand.length - index;
-                return (
-                  <div
-                    key={card.id}
+            <div className="flex justify-center -space-x-16">
+              {activeHand.map((card, index) => (
+                <div
+                  key={card.id}
+                  className={cn(
+                    "transition-all duration-300 ease-out hover:-translate-y-4",
+                    { "hover:z-20": !usedCardIndices.has(index) }
+                  )}
+                  style={{ zIndex: index }}
+                >
+                  <GameCard
+                    card={card}
+                    mode={game.gameMode}
+                    onClick={() => handleCardClick(card, index)}
                     className={cn(
-                      "transition-all duration-300 ease-out hover:-translate-y-4",
-                      { "hover:z-20": !usedCardIndices.has(index) }
+                      'transition-all duration-200',
+                      {
+                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
+                        "cursor-not-allowed": !isMyTurn
+                      }
                     )}
-                    style={{ zIndex }}
-                  >
-                    <GameCard
-                      card={card}
-                      mode={game.gameMode}
-                      onClick={() => handleCardClick(card, index)}
-                      className={cn(
-                        'transition-all duration-200',
-                        {
-                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
-                          "cursor-not-allowed": !isMyTurn
-                        }
-                      )}
-                    />
-                  </div>
-                )
-              })}
+                  />
+                </div>
+              ))}
             </div>
           </div>
       </div>
     </div>
   );
 }
-
-    
