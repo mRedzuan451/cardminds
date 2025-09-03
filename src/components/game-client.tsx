@@ -717,9 +717,9 @@ const renderDiscardUI = () => {
               <User />
               Your Hand
             </h2>
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex justify-center -space-x-12 md:-space-x-16">
               {activeHand.map((card, index) => (
-                <div key={card.id} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10">
+                <div key={card.id} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10 hover:-translate-y-4">
                   <GameCard
                     card={card}
                     mode={game.gameMode}
