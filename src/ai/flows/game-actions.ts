@@ -273,15 +273,6 @@ async function advanceTurn(gameId: string) {
                 p.totalScore = newTotalScore;
             });
             
-            // Check for game over *after* updating scores for the round
-            if (game.gameMode === 'special' && game.targetScore) {
-                const winner = players.find(p => p.totalScore >= game.targetScore!);
-                if (winner) {
-                    console.log(`[advanceTurn] Game over condition met during round end. Total score: ${winner.totalScore}`);
-                    // Intentionally fall through to roundOver state first. Game over will be set on nextRound click.
-                }
-            }
-            
             const highestScore = Math.max(...players.map(p => p.roundScore));
             const winners = players.filter(p => p.roundScore === highestScore);
             const roundWinnerIds = highestScore > 0 ? winners.map(w => w.id) : [];
@@ -695,7 +686,11 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const playerDoc = await transaction.get(playerRef);
                 if (!playerDoc.exists()) throw new Error("Player not found");
                 const player = playerDoc.data() as Player;
-                const clonedCard = { ...(target as Card), id: `cloned-${Date.now()}` };
+                const originalCard = target as Card;
+                const clonedCard: Card = { 
+                    ...originalCard, 
+                    id: `cloned-${originalCard.id}-${Date.now()}` 
+                };
                 const newHand = [...player.hand, clonedCard];
                 transaction.update(playerRef, { hand: newHand });
                 
