@@ -50,7 +50,7 @@ export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRa
         const specialDecks = playerCount >= 4 ? 2 : 1;
         for (let i = 0; i < specialDecks; i++) {
             for (const rank of allowedSpecialRanks) {
-                // Add two of each special card per deck
+                // Add two of each special card per deck, ensuring unique IDs
                 deck.push({ id: `card-${uniqueIdCounter++}`, suit: 'Special', rank });
                 deck.push({ id: `card-${uniqueIdCounter++}`, suit: 'Special', rank });
             }
@@ -318,7 +318,3 @@ export function calculateScore(result: number, target: number, cardsUsed: number
   const score = Math.max(0, 500 - (difference * 10) - (cardsUsed * 20));
   return Math.round(score);
 }
-
-    
-
-    

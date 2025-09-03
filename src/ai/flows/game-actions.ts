@@ -633,13 +633,11 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
-            // The Shuffle card is consumed, and the rest of the hand is shuffled.
             const handToShuffle = player.hand.filter(c => c.id !== card.id);
             const shuffledHand = shuffleDeck(handToShuffle);
             
             transaction.update(playerRef, { hand: shuffledHand });
             transaction.update(gameRef, {
-                // The deck is not modified, only the player's hand.
                 lastSpecialCardPlay: {
                     cardRank: 'SH',
                     playerName: player.name,
@@ -706,7 +704,6 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
             case 'SB': { // Sabotage Card
                 const targetPlayerId = target as string;
                 const targetPlayerRef = doc(db, 'games', gameId, 'players', targetPlayerId);
-
                 const targetPlayerDoc = await transaction.get(targetPlayerRef);
 
                 if (!targetPlayerDoc.exists()) throw new Error("Target player not found");
@@ -715,12 +712,21 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const targetHand = [...targetPlayer.hand];
 
                 if (targetHand.length > 0) {
-                    const cardToRemoveIndex = Math.floor(Math.random() * targetHand.length);
-                    const stolenCard = targetHand.splice(cardToRemoveIndex, 1)[0];
+                    const cardToStealIndex = Math.floor(Math.random() * targetHand.length);
+                    const stolenCardOriginal = targetHand.splice(cardToStealIndex, 1)[0];
                     
-                    const newActingPlayerHand = [...actingPlayer.hand, stolenCard];
+                    // Create a deep clone with a new unique ID for the acting player
+                    const stolenCardClone: Card = {
+                        ...stolenCardOriginal,
+                        id: `stolen-${stolenCardOriginal.id}-${Date.now()}`
+                    };
 
-                    transaction.update(targetPlayerRef, { hand: targetHand });
+                    const newActingPlayerHand = [...actingPlayer.hand, stolenCardClone];
+
+                    // Remove the original card from the target's hand
+                    const newTargetHand = targetPlayer.hand.filter(c => c.id !== stolenCardOriginal.id);
+                    
+                    transaction.update(targetPlayerRef, { hand: newTargetHand });
                     transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
                 }
                 
