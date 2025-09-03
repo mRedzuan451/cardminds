@@ -722,24 +722,26 @@ const renderDiscardUI = () => {
               <User />
               Your Hand
             </h2>
-            <div className="flex justify-center -space-x-12 md:-space-x-16">
+            <div className="flex justify-center -space-x-16">
               {activeHand.map((card, index) => (
-                <div 
-                  key={card.id} 
+                <div
+                  key={card.id}
                   className={cn(
-                      "transition-all duration-300 ease-out hover:-translate-y-4",
-                      usedCardIndices.has(index) ? 'z-0' : 'z-10 hover:z-20'
+                    "transition-all duration-300 ease-out hover:-translate-y-4",
+                    { "z-0": usedCardIndices.has(index), "hover:z-20": !usedCardIndices.has(index) }
                   )}
-                  style={{ zIndex: usedCardIndices.has(index) ? 0 : activeHand.length - index }}
-                  >
+                  style={{ zIndex: usedCardIndices.has(index) ? 0 : index }}
+                >
                   <GameCard
                     card={card}
                     mode={game.gameMode}
                     onClick={() => handleCardClick(card, index)}
                     className={cn(
                       'transition-all duration-200',
-                      usedCardIndices.has(index) && "opacity-30 scale-90 -translate-y-4 cursor-not-allowed",
-                      !isMyTurn && "cursor-not-allowed"
+                      {
+                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
+                        "cursor-not-allowed": !isMyTurn
+                      }
                     )}
                   />
                 </div>
@@ -750,6 +752,3 @@ const renderDiscardUI = () => {
     </div>
   );
 }
-
-
-    
