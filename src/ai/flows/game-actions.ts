@@ -621,22 +621,20 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         // Find and remove card from hand
         const cardIndex = player.hand.findIndex(c => c.id === card.id);
         if (cardIndex === -1) throw new Error("Card not in hand");
-        const newHandBeforeShuffle = [...player.hand];
-        newHandBeforeShuffle.splice(cardIndex, 1);
         
         const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             let newDeck = [...game.deck];
-            // The entire hand including the shuffle card gets discarded
-            const handToDiscard = [...player.hand]; 
-            const handSize = player.hand.length; 
+            // The entire hand, excluding the shuffle card itself, is returned to the deck
+            const handToShuffle = player.hand.filter(c => c.id !== card.id);
+            const handSizeAfterShuffleCard = player.hand.length - 1; // We draw back this many cards
             
-            newDeck.push(...handToDiscard);
+            newDeck.push(...handToShuffle);
             newDeck = shuffleDeck(newDeck);
             
             // Draw the same number of cards back
-            const newCardsForHand = newDeck.splice(0, handSize);
+            const newCardsForHand = newDeck.splice(0, handSizeAfterShuffleCard);
             
             transaction.update(playerRef, { hand: newCardsForHand });
             transaction.update(gameRef, {
@@ -651,7 +649,9 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             
         } else {
              // For other cards, remove the card and set game state to get more input
-             transaction.update(playerRef, { hand: newHandBeforeShuffle });
+             const newHand = [...player.hand];
+             newHand.splice(cardIndex, 1);
+             transaction.update(playerRef, { hand: newHand });
              transaction.update(gameRef, { 
                 gameState: 'specialAction',
                 specialAction: {
