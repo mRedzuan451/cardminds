@@ -175,18 +175,27 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!isMyTurn || !localPlayer || !game) return;
 
     if (game.gameMode === 'easy') {
-      if (equation.length < 3) {
-        toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
-        return;
-      }
-      if (equation.filter(term => typeof term === 'string').length === 0) {
-        toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
-        return;
-      }
-      if (equation.length > 0 && typeof equation[equation.length -1] !== 'number') {
-        toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
-        return;
-      }
+        // Allow single number submission
+        if (equation.length === 1) {
+            if (typeof equation[0] !== 'number') {
+                toast({ title: "Invalid Submission", description: "If you submit one card, it must be a number.", variant: 'destructive'});
+                return;
+            }
+        } else {
+            // Rules for multi-card equations
+            if (equation.length < 3) {
+                toast({ title: "Invalid Equation", description: "Your equation must have at least 3 terms.", variant: 'destructive'});
+                return;
+            }
+            if (equation.filter(term => typeof term === 'string').length === 0) {
+                toast({ title: "Invalid Equation", description: "An equation must contain at least one operator.", variant: 'destructive'});
+                return;
+            }
+            if (typeof equation[equation.length - 1] !== 'number') {
+                toast({ title: "Invalid Equation", description: "Equation must end with a number.", variant: 'destructive'});
+                return;
+            }
+        }
     }
 
     const result = evaluateEquation(equation, game.gameMode);
@@ -416,7 +425,7 @@ const renderDiscardUI = () => {
 
 
   const equationString = useMemo(() => equation.map((term, i) => (
-    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
+    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}</Badge>
   )), [equation]);
   
   const targetEquation = useMemo(() => {
@@ -605,7 +614,7 @@ const renderDiscardUI = () => {
               {targetEquation} = <span className="text-primary">{game.targetNumber}</span>
             </p>
           )}
-          {game.gameMode === 'pro' && (
+          {(game.gameMode === 'pro' || (game.gameMode === 'special' && game.targetCards.length < 3)) && (
              <p className="text-center text-2xl font-bold">
                 Concatenated to form <span className="text-primary">{game.targetNumber}</span>
              </p>
@@ -695,7 +704,7 @@ const renderDiscardUI = () => {
                     {player.equation.length > 0 ? (
                       <>
                       {player.equation.map((term, i) => (
-                        <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term}</Badge>
+                        <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}</Badge>
                       ))}
                       <span className="mx-2">=</span>
                       <span className="font-bold text-accent">{player.finalResult}</span>
@@ -719,7 +728,7 @@ const renderDiscardUI = () => {
             </h2>
             <div className="flex justify-center -space-x-12 md:-space-x-16">
               {activeHand.map((card, index) => (
-                <div key={card.id} className="transition-all duration-300 ease-out animate-in fade-in-0 slide-in-from-bottom-10 hover:-translate-y-4">
+                <div key={card.id} className="transition-all duration-300 ease-out hover:-translate-y-4 hover:z-20">
                   <GameCard
                     card={card}
                     mode={game.gameMode}
