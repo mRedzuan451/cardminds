@@ -36,11 +36,12 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
 export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRanks: Rank[] = SPECIAL_RANKS): Card[] {
     const deck: Card[] = [];
     const deckCount = playerCount >= 4 ? 2 : 1;
+    let uniqueIdCounter = 0;
 
     for (let i = 0; i < deckCount; i++) {
         for (const suit of SUITS) {
             for (const rank of RANKS) {
-                deck.push({ id: `deck-${i}-${suit}-${rank}`, suit, rank });
+                deck.push({ id: `card-${uniqueIdCounter++}`, suit, rank });
             }
         }
     }
@@ -50,8 +51,8 @@ export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRa
         for (let i = 0; i < specialDecks; i++) {
             for (const rank of allowedSpecialRanks) {
                 // Add two of each special card per deck
-                deck.push({ id: `deck-${i}-special-${rank}-1`, suit: 'Special', rank });
-                deck.push({ id: `deck-${i}-special-${rank}-2`, suit: 'Special', rank });
+                deck.push({ id: `card-${uniqueIdCounter++}`, suit: 'Special', rank });
+                deck.push({ id: `card-${uniqueIdCounter++}`, suit: 'Special', rank });
             }
         }
     }
@@ -317,5 +318,7 @@ export function calculateScore(result: number, target: number, cardsUsed: number
   const score = Math.max(0, 500 - (difference * 10) - (cardsUsed * 20));
   return Math.round(score);
 }
+
+    
 
     
