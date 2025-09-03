@@ -29,7 +29,7 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
     return (
       <div
         className={cn(
-          "aspect-[2.b5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
+          "aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
           className
         )}
         {...props}
