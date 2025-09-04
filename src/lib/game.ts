@@ -255,10 +255,10 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
                     if (typeof subResult === 'object' && subResult.error) {
                         return subResult;
                     }
-                    powerProcessedTerms.push(Math.pow(subResult as number, 2));
+                    powerProcessedTerms.push('Math.pow(', subResult, ', 2)');
 
                 } else if (typeof base === 'number') {
-                    powerProcessedTerms.push(Math.pow(base, 2));
+                    powerProcessedTerms.push(`Math.pow(${base}, 2)`);
                 }
                 else {
                     return { error: "Power operator must follow a number or a group." };
@@ -279,8 +279,8 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
         if (openParen !== closeParen) {
             return { error: 'Mismatched parentheses.' };
         }
-        // Allows numbers, parentheses, and the basic operators.
-        if (/[^0-9\s()+\-*/.]/.test(expression)) {
+        // Allows numbers, parentheses, and the basic operators, plus Math.pow
+        if (/[^0-9\s()+\-*/.,Mathpow]/.test(expression)) {
             return { error: 'Invalid characters in equation.'};
         }
         // Prevents things like `5 * * 2`
