@@ -222,6 +222,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const activeHand = useMemo(() => {
     return localPlayer?.hand ?? [];
   }, [localPlayer]);
+
+  const handRow1 = useMemo(() => activeHand.slice(0, 7), [activeHand]);
+  const handRow2 = useMemo(() => activeHand.slice(7), [activeHand]);
   
   const handleParenthesisClick = (paren: '(' | ')') => {
     setEquation([...equation, paren]);
@@ -837,29 +840,29 @@ const renderDiscardUI = () => {
       )}
 
       <div className="pt-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
-              <User />
-              Your Hand
-            </h2>
+        <div className="text-center">
+          <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
+            <User />
+            Your Hand
+          </h2>
+          <div className="flex flex-col items-center gap-4">
             <div className="flex justify-center -space-x-12">
-              {activeHand.map((card, index) => (
+              {handRow1.map((card, index) => (
                 <div
                   key={card.id}
                   className={cn(
-                    "transition-all duration-300 ease-out hover:-translate-y-4",
-                    { "hover:z-20": !usedCardIndices.has(index) }
+                    "transition-all duration-300 ease-out hover:-translate-y-4"
                   )}
                   style={{ zIndex: index }}
                 >
                   <GameCard
                     card={card}
                     mode={game.gameMode}
-                    onClick={() => handleCardClick(card, index)}
+                    onClick={() => handleCardClick(card, activeHand.findIndex(c => c.id === card.id))}
                     className={cn(
                       'transition-all duration-200',
                       {
-                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(index),
+                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(activeHand.findIndex(c => c.id === card.id)),
                         "cursor-not-allowed": !isMyTurn
                       }
                     )}
@@ -867,10 +870,35 @@ const renderDiscardUI = () => {
                 </div>
               ))}
             </div>
+            {handRow2.length > 0 && (
+              <div className="flex justify-center -space-x-12">
+                {handRow2.map((card, index) => (
+                  <div
+                    key={card.id}
+                    className={cn(
+                      "transition-all duration-300 ease-out hover:-translate-y-4"
+                    )}
+                    style={{ zIndex: index + 7 }}
+                  >
+                    <GameCard
+                      card={card}
+                      mode={game.gameMode}
+                      onClick={() => handleCardClick(card, activeHand.findIndex(c => c.id === card.id))}
+                      className={cn(
+                        'transition-all duration-200',
+                        {
+                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(activeHand.findIndex(c => c.id === card.id)),
+                          "cursor-not-allowed": !isMyTurn
+                        }
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
       </div>
     </div>
   );
 }
-
-    
