@@ -705,31 +705,40 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const targetPlayerId = target as string;
                 const targetPlayerRef = doc(db, 'games', gameId, 'players', targetPlayerId);
                 const targetPlayerDoc = await transaction.get(targetPlayerRef);
-
+            
                 if (!targetPlayerDoc.exists()) throw new Error("Target player not found");
-                
                 const targetPlayer = targetPlayerDoc.data() as Player;
-                const targetHand = [...targetPlayer.hand];
-
-                if (targetHand.length > 0) {
-                    const cardToStealIndex = Math.floor(Math.random() * targetHand.length);
-                    const stolenCardOriginal = targetHand.splice(cardToStealIndex, 1)[0];
-                    
-                    // Create a deep clone with a new unique ID for the acting player
-                    const stolenCardClone: Card = {
-                        ...stolenCardOriginal,
-                        id: `stolen-${stolenCardOriginal.id}-${Date.now()}`
-                    };
-
-                    const newActingPlayerHand = [...actingPlayer.hand, stolenCardClone];
-
-                    // Remove the original card from the target's hand
-                    const newTargetHand = targetPlayer.hand.filter(c => c.id !== stolenCardOriginal.id);
-                    
-                    transaction.update(targetPlayerRef, { hand: newTargetHand });
-                    transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
-                }
                 
+                if (targetPlayer.hand.length === 0) {
+                    // Target has no cards, so do nothing.
+                    lastPlayUpdate.lastSpecialCardPlay = {
+                        cardRank: 'SB',
+                        playerName: actingPlayer.name,
+                        targetPlayerName: targetPlayer.name,
+                        timestamp: Date.now(),
+                    };
+                    turnShouldAdvance = false;
+                    break;
+                }
+            
+                // Steal a random card
+                const cardToStealIndex = Math.floor(Math.random() * targetPlayer.hand.length);
+                const stolenCardOriginal = targetPlayer.hand[cardToStealIndex];
+            
+                // Create a unique clone for the acting player
+                const stolenCardClone: Card = {
+                    ...stolenCardOriginal,
+                    id: `stolen-${stolenCardOriginal.id}-${Date.now()}`
+                };
+            
+                // Add the new card to the acting player's hand
+                const newActingPlayerHand = [...actingPlayer.hand, stolenCardClone];
+                transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
+            
+                // Remove the original card from the target's hand
+                const newTargetHand = targetPlayer.hand.filter(c => c.id !== stolenCardOriginal.id);
+                transaction.update(targetPlayerRef, { hand: newTargetHand });
+            
                 lastPlayUpdate.lastSpecialCardPlay = {
                     cardRank: 'SB',
                     playerName: actingPlayer.name,
