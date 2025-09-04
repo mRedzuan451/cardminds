@@ -288,7 +288,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     const result = evaluateEquation(equation, game.gameMode);
 
     if (typeof result === 'object' && result.error) {
-        if (game.gameMode === 'special') {
+        if (game.gameMode === 'special' || game.gameMode === 'pro') {
             toast({ title: "Invalid Equation", description: result.error, variant: 'destructive'});
         }
         return;
@@ -450,7 +450,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     <div>
                         <p>Select a card from your hand to clone:</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                            {activeHand.map((card, index) => (
+                            {activeHand.filter(c => c.suit !== 'Special').map((card) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
                             ))}
                         </div>
