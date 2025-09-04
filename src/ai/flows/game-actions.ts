@@ -710,7 +710,6 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const targetPlayer = targetPlayerDoc.data() as Player;
                 
                 if (targetPlayer.hand.length === 0) {
-                    // Target has no cards, so do nothing.
                     lastPlayUpdate.lastSpecialCardPlay = {
                         cardRank: 'SB',
                         playerName: actingPlayer.name,
@@ -736,7 +735,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
             
                 // Remove the original card from the target's hand
-                const newTargetHand = targetPlayer.hand.filter(c => c.id !== stolenCardOriginal.id);
+                const newTargetHand = targetPlayer.hand.filter((c, index) => index !== cardToStealIndex);
                 transaction.update(targetPlayerRef, { hand: newTargetHand });
             
                 lastPlayUpdate.lastSpecialCardPlay = {
@@ -809,3 +808,5 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
+    
