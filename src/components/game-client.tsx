@@ -29,6 +29,7 @@ import * as gameActions from '@/ai/flows/game-actions';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
+import { ShuffleAnimation } from './shuffle-animation';
 
 const db = getFirestore(firebaseApp);
 
@@ -113,6 +114,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [hasJoined, setHasJoined] = useState(false);
   const [selectedToDiscard, setSelectedToDiscard] = useState<Set<string>>(new Set());
   const [isSpecialConfigOpen, setIsSpecialConfigOpen] = useState(false);
+  const [showShuffle, setShowShuffle] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -328,7 +330,12 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
        toast({ title: "Only the creator can start the game", variant: 'destructive' });
        return;
     }
-    await gameActions.startGame({ gameId });
+
+    setShowShuffle(true);
+    setTimeout(async () => {
+        await gameActions.startGame({ gameId });
+        setShowShuffle(false);
+    }, 3000);
   };
   
   const handleSetGameMode = async (mode: 'easy' | 'pro' | 'special') => {
@@ -472,7 +479,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 )}
                 {cardRank === 'CL' && (
                     <div>
-                        <p>Select a card from your hand to clone:</p>
+                        <p>Select a non-special card from your hand to clone:</p>
                         <div className="flex flex-wrap gap-2 mt-2 max-h-60 overflow-y-auto">
                             {activeHand.filter(c => c.suit !== 'Special').map((card) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
@@ -594,6 +601,9 @@ const renderDiscardUI = () => {
   }
 
   if (game.gameState === 'lobby') {
+    if (showShuffle) {
+        return <ShuffleAnimation />;
+    }
     return (
       <div className="container mx-auto p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-150px)]">
         {isSpecialConfigOpen && localPlayer.id === game.creatorId && (
