@@ -643,7 +643,7 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
         const cardIndex = player.hand.findIndex(c => c.id === card.id);
         if (cardIndex === -1) throw new Error("Card not in hand");
         
-        const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
+        const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE' | 'GA';
         
         if (cardRank === 'SH') { // Shuffle Card - action is immediate
             const handToShuffle = player.hand.filter(c => c.id !== card.id);
@@ -685,7 +685,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
         const gameDoc = await transaction.get(gameRef);
         if (!gameDoc.exists()) throw new Error("Game not found");
         const game = gameDoc.data() as Game;
-        const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE';
+        const cardRank = card.rank as 'CL' | 'SB' | 'SH' | 'DE' | 'GA';
         
         const actingPlayerRef = doc(db, 'games', gameId, 'players', playerId);
         const actingPlayerDoc = await transaction.get(actingPlayerRef);
@@ -695,6 +695,39 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
         let lastPlayUpdate: Partial<Game> = {};
 
         switch(cardRank) {
+            case 'GA': { // Gamble Card
+                if (!target || typeof target.id !== 'string') {
+                    throw new Error("Gamble requires a target card to discard.");
+                }
+
+                const cardToDiscard = target as Card;
+                const newHand = actingPlayer.hand.filter(c => c.id !== cardToDiscard.id);
+                
+                if (newHand.length === actingPlayer.hand.length) {
+                    throw new Error("Card to discard not found in your hand.");
+                }
+
+                let newDeck = [...game.deck];
+                const drawnCards = newDeck.splice(0, 2);
+                if (drawnCards.length < 2) {
+                    throw new Error("Not enough cards in the deck to draw 2.");
+                }
+
+                const finalHand = [...newHand, ...drawnCards];
+                transaction.update(actingPlayerRef, { hand: finalHand });
+                
+                lastPlayUpdate = {
+                    deck: newDeck,
+                    discardPile: arrayUnion(cardToDiscard),
+                    lastSpecialCardPlay: {
+                        cardRank: 'GA',
+                        playerName: actingPlayer.name,
+                        timestamp: Date.now(),
+                    }
+                };
+                turnShouldAdvance = false;
+                break;
+            }
             case 'CL': { // Clone Card
                 const playerRef = doc(db, 'games', gameId, 'players', playerId);
                 const playerDoc = await transaction.get(playerRef);

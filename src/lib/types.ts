@@ -1,6 +1,6 @@
 
 export type Suit = 'Spades' | 'Hearts' | 'Diamonds' | 'Clubs' | 'Special';
-export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'CL' | 'SB' | 'SH' | 'DE';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'CL' | 'SB' | 'SH' | 'DE' | 'GA';
 
 export interface Card {
   id: string;
@@ -47,12 +47,12 @@ export interface Game {
     nextGameId?: string;
     specialAction?: {
         playerId: string;
-        cardRank: 'CL' | 'SB' | 'SH' | 'DE';
+        cardRank: 'CL' | 'SB' | 'SH' | 'DE' | 'GA';
     };
     discardingPlayerId?: string | null;
     allowedSpecialCards?: Rank[];
     lastSpecialCardPlay?: {
-        cardRank: 'CL' | 'SB' | 'SH' | 'DE';
+        cardRank: 'CL' | 'SB' | 'SH' | 'DE' | 'GA';
         playerName: string;
         targetPlayerName?: string;
         timestamp: number;

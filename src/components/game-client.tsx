@@ -136,7 +136,10 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                  description = `${playerName} used the ${cardName} card to clone a card!`;
             } else if (cardRank === 'DE') {
                 description = `${playerName} used the ${cardName} card to change the target!`;
+            } else if (cardRank === 'GA') {
+                description = `${playerName} used the ${cardName} card to discard 1 and draw 2!`;
             }
+
 
             toast({
                 title: 'Special Card Played!',
@@ -402,13 +405,19 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
   const handleSpecialAction = async (target: any) => {
     if (!game || !game.specialAction || !localPlayer) return;
-    await gameActions.resolveSpecialCard({
-        gameId,
-        playerId: localPlayer.id,
-        card: { suit: 'Special', rank: game.specialAction.cardRank, id: '' }, // id can be dummy
-        target
-    });
-    await gameActions.endSpecialAction({ gameId });
+    try {
+        await gameActions.resolveSpecialCard({
+            gameId,
+            playerId: localPlayer.id,
+            card: { suit: 'Special', rank: game.specialAction.cardRank, id: '' }, // id can be dummy
+            target
+        });
+        await gameActions.endSpecialAction({ gameId });
+    } catch (e: any) {
+        console.error(`Error resolving special card:`, e);
+        toast({ title: "Error Playing Card", description: e.message, variant: "destructive" });
+        await gameActions.endSpecialAction({ gameId }); // End action even on error
+    }
   };
 
   const handleDiscardCardClick = (card: CardType) => {
@@ -446,10 +455,20 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                 <AlertDialogHeader>
                     <AlertDialogTitle>Play {CARD_VALUES[cardRank as Rank]} Card</AlertDialogTitle>
                 </AlertDialogHeader>
+                 {cardRank === 'GA' && (
+                    <div>
+                        <p>Select a card from your hand to discard:</p>
+                        <div className="flex flex-wrap gap-2 mt-2 max-h-60 overflow-y-auto">
+                            {activeHand.map((card) => (
+                                <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {cardRank === 'CL' && (
                     <div>
                         <p>Select a card from your hand to clone:</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-2 max-h-60 overflow-y-auto">
                             {activeHand.filter(c => c.suit !== 'Special').map((card) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
                             ))}
@@ -902,5 +921,3 @@ const renderDiscardUI = () => {
     </div>
   );
 }
-
-    

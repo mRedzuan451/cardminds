@@ -12,6 +12,7 @@ export default function RulesPage() {
       { rank: 'SB', name: 'Sabotage', description: 'Play this card to steal a random card from an opponent of your choice.' },
       { rank: 'SH', name: 'Shuffle', description: 'Play this card to instantly shuffle the cards currently in your hand.' },
       { rank: 'DE', name: 'Destiny', description: 'Play this card to re-roll one of the face-up Target Cards, changing the Target Number.' },
+      { rank: 'GA', name: 'Gamble', description: 'Discard one card from your hand to draw two new cards from the deck.' },
   ];
 
   return (
@@ -90,7 +91,7 @@ export default function RulesPage() {
             <p>Exclusive to Special Mode, these cards introduce powerful strategic actions.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
               {specialCards.map(sc => {
-                  const card = { id: sc.rank, suit: 'Special' as const, rank: sc.rank as "CL" | "SB" | "SH" | "DE" };
+                  const card = { id: sc.rank, suit: 'Special' as const, rank: sc.rank as "CL" | "SB" | "SH" | "DE" | "GA" };
                   return (
                       <div key={sc.rank} className="flex items-center gap-4 bg-muted p-4 rounded-lg">
                           <GameCard card={card} mode="special" className="w-20 md:w-24 flex-shrink-0" />

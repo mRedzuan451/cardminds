@@ -3,12 +3,12 @@ import type { Suit, Rank, Card, EquationTerm, GameMode } from './types';
 
 export const SUITS: Suit[] = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
 export const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-export const SPECIAL_RANKS: Rank[] = ['CL', 'SB', 'SH', 'DE'];
+export const SPECIAL_RANKS: Rank[] = ['CL', 'SB', 'SH', 'DE', 'GA'];
 
 const BASE_CARD_VALUES: Record<Rank, EquationTerm> = {
   'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
   'J': '+', 'Q': '-', 'K': '*',
-  'CL': 'Clone', 'SB': 'Sabotage', 'SH': 'Shuffle', 'DE': 'Destiny'
+  'CL': 'Clone', 'SB': 'Sabotage', 'SH': 'Shuffle', 'DE': 'Destiny', 'GA': 'Gamble'
 };
 
 export const PRO_CARD_VALUES: Record<Rank, EquationTerm> = {
