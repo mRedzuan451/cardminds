@@ -8,7 +8,7 @@ export const SPECIAL_RANKS: Rank[] = ['CL', 'SB', 'SH', 'DE', 'GA'];
 const BASE_CARD_VALUES: Record<Rank, EquationTerm> = {
   'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
   'J': '+', 'Q': '-', 'K': '*',
-  'CL': 'Clone', 'SB': 'Sabotage', 'SH': 'Shuffle', 'DE': 'Destiny', 'GA': 'Gamble'
+  'CL': 'Echo', 'SB': 'Curse', 'SH': 'Rift', 'DE': 'Prophecy', 'GA': 'Bargain'
 };
 
 export const PRO_CARD_VALUES: Record<Rank, EquationTerm> = {
@@ -231,42 +231,40 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
             terms = newTerms;
         }
 
-        // Handle Power of 2 (**) as a unary operator applied to the preceding number/group
-        let powerProcessedTerms: EquationTerm[] = [];
-        let i = 0;
-        while (i < terms.length) {
+        // Handle Power of 2 (**) by wrapping the preceding element/group in Math.pow
+        let powerProcessedTerms: (string | number)[] = [];
+        for (let i = terms.length - 1; i >= 0; i--) {
             if (terms[i] === '**') {
-                const base = powerProcessedTerms.pop();
+                const base = powerProcessedTerms.shift(); // The element to be squared
 
-                if (base === ')') {
+                if (typeof base === 'undefined') {
+                    return { error: "Power operator must have a base." };
+                }
+
+                if (typeof base === 'number') {
+                     powerProcessedTerms.unshift(`Math.pow(${base}, 2)`);
+                } else if (typeof base === 'string' && base.startsWith('Math.pow')) {
+                     powerProcessedTerms.unshift(`Math.pow(${base}, 2)`);
+                } else if (base === ')') {
                     let parenCount = 1;
-                    const expressionInParen: EquationTerm[] = [')'];
-                    while(parenCount > 0 && powerProcessedTerms.length > 0) {
-                        const popped = powerProcessedTerms.pop();
-                        expressionInParen.unshift(popped!);
+                    const expressionInParen: (string | number)[] = [')'];
+                    
+                    while (parenCount > 0 && powerProcessedTerms.length > 0) {
+                        const popped = powerProcessedTerms.shift()!;
+                        expressionInParen.unshift(popped);
                         if (popped === '(') parenCount--;
                         if (popped === ')') parenCount++;
                     }
-                     if (parenCount !== 0) {
+
+                    if (parenCount !== 0) {
                         return { error: "Mismatched parentheses with power operator." };
                     }
-                    const subExpression = expressionInParen.slice(1, -1);
-                    const subResult = evaluateEquation(subExpression, mode);
-                    if (typeof subResult === 'object' && subResult.error) {
-                        return subResult;
-                    }
-                    powerProcessedTerms.push('Math.pow(', subResult, ', 2)');
-
-                } else if (typeof base === 'number') {
-                    powerProcessedTerms.push(`Math.pow(${base}, 2)`);
+                    powerProcessedTerms.unshift(`Math.pow(${expressionInParen.join(' ')}, 2)`);
+                } else {
+                     return { error: "Invalid base for power operator." };
                 }
-                else {
-                    return { error: "Power operator must follow a number or a group." };
-                }
-                i++;
             } else {
-                powerProcessedTerms.push(terms[i]);
-                i++;
+                powerProcessedTerms.unshift(terms[i]);
             }
         }
         terms = powerProcessedTerms;

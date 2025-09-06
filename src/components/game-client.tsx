@@ -36,13 +36,18 @@ const db = getFirestore(firebaseApp);
 function SpecialCardConfig({ game, onSave, onCancel }: { game: Game, onSave: (allowed: Rank[]) => void, onCancel: () => void }) {
     const [selectedCards, setSelectedCards] = useState<Set<Rank>>(new Set(game.allowedSpecialCards ?? SPECIAL_RANKS));
     const CARD_VALUES = getCardValues('special');
+    const MAX_SPECIAL_CARDS = 4;
 
     const handleToggle = (rank: Rank) => {
         const newSelection = new Set(selectedCards);
         if (newSelection.has(rank)) {
             newSelection.delete(rank);
         } else {
-            newSelection.add(rank);
+            if (newSelection.size < MAX_SPECIAL_CARDS) {
+                newSelection.add(rank);
+            } else {
+                toast({ title: `You can only select up to ${MAX_SPECIAL_CARDS} special cards.`, variant: "destructive" });
+            }
         }
         setSelectedCards(newSelection);
     };
@@ -57,7 +62,7 @@ function SpecialCardConfig({ game, onSave, onCancel }: { game: Game, onSave: (al
                 <DialogHeader>
                     <DialogTitle className="font-headline text-2xl">Configure Special Cards</DialogTitle>
                     <DialogDescription>
-                        Select which special cards will be included in the deck for this game.
+                        Select up to {MAX_SPECIAL_CARDS} special cards to include in the deck for this game.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">

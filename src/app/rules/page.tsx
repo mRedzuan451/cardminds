@@ -8,11 +8,11 @@ import { SPECIAL_RANKS } from '@/lib/game';
 
 export default function RulesPage() {
   const specialCards = [
-      { rank: 'CL', name: 'Clone', description: 'Play this card to duplicate any non-special card in your hand.' },
-      { rank: 'SB', name: 'Sabotage', description: 'Play this card to steal a random card from an opponent of your choice.' },
-      { rank: 'SH', name: 'Shuffle', description: 'Play this card to instantly shuffle the cards currently in your hand.' },
-      { rank: 'DE', name: 'Destiny', description: 'Play this card to re-roll one of the face-up Target Cards, changing the Target Number.' },
-      { rank: 'GA', name: 'Gamble', description: 'Discard one card from your hand to draw two new cards from the deck.' },
+      { rank: 'CL', name: 'Echo', description: 'Play this card to duplicate any non-special card in your hand.' },
+      { rank: 'SB', name: 'Curse', description: 'Play this card to steal a random card from an opponent of your choice.' },
+      { rank: 'SH', name: 'Rift', description: 'Play this card to instantly shuffle the cards currently in your hand.' },
+      { rank: 'DE', name: 'Prophecy', description: 'Play this card to re-roll one of the face-up Target Cards, changing the Target Number.' },
+      { rank: 'GA', name: 'Bargain', description: 'Discard one card from your hand to draw two new cards from the deck.' },
   ];
 
   return (
@@ -64,13 +64,13 @@ export default function RulesPage() {
               <li>On your turn, you will automatically draw one new card.</li>
               <li>You then have two choices:</li>
               <li className="ml-4 mt-2">
-                <strong>A) Play an Equation:</strong> Select cards from your hand to form a valid equation (e.g., 7 + 1). Once you submit, your score is calculated and the round ends.
+                <strong>A) Play an Equation:</strong> Select cards from your hand to form a valid equation (e.g., 7 + 1). Once you submit, your score is calculated and your turn ends.
               </li>
               <li className="ml-4 mt-2">
-                <strong>B) Pass:</strong> If you cannot or do not want to make an equation, you can pass your turn.
+                <strong>B) Pass:</strong> If you cannot or do not want to make an equation, you can pass your turn. Your turn will also end.
               </li>
-              <li>If all players pass, the round ends. The player with the highest round score wins the round.</li>
-              <li>The game is played over 3 rounds in Easy/Pro mode. In Special mode, the game continues until a player reaches the target score.</li>
+              <li>If all players pass consecutively, the round ends. The player with the highest round score wins the round.</li>
+              <li>The game is played over 3 rounds in Easy/Pro mode.</li>
             </ol>
           </section>
           
@@ -82,13 +82,13 @@ export default function RulesPage() {
               <h3 className="font-bold text-xl mt-2">Pro Mode</h3>
               <p>A more complex mode where the target is generated from two concatenated cards (e.g. a 2 and 5 make a target of 25). The King card is division (/). Parentheses `()` can be used to group operations.</p>
               <h3 className="font-bold text-xl mt-2">Special Mode</h3>
-              <p>This mode includes everything in Pro Mode, but adds powerful special cards to the deck. The King is now Power of 2 (^2). Instead of a set number of rounds, the first player to reach the target score (usually 3,000 points) wins the game.</p>
+              <p>This mode includes everything in Pro Mode, but adds powerful special cards to the deck. The King is now Power of 2 (^2). Instead of a set number of rounds, the first player to reach the target score (usually 3,000 points) wins the game. You can use special cards to perform strategic actions; using one does not end your turn.</p>
             </div>
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-2 font-headline">Special Cards</h2>
-            <p>Exclusive to Special Mode, these cards introduce powerful strategic actions.</p>
+            <h2 className="text-2xl font-bold mb-2 font-headline">Special Cards (Special Mode Only)</h2>
+            <p>At the start of a Special Mode game, the creator chooses up to four types of special cards to include in the deck. These cards introduce powerful strategic actions and do not count as your main action for the turn.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
               {specialCards.map(sc => {
                   const card = { id: sc.rank, suit: 'Special' as const, rank: sc.rank as "CL" | "SB" | "SH" | "DE" | "GA" };

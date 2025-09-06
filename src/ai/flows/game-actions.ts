@@ -779,9 +779,11 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 // Steal a random card
                 const cardToStealIndex = Math.floor(Math.random() * targetPlayer.hand.length);
                 const stolenCard = targetPlayer.hand[cardToStealIndex];
+
+                const newStolenCard: Card = { ...stolenCard, id: `stolen-${stolenCard.id}-${Date.now()}`};
             
                 // Add the stolen card to the acting player's hand
-                const newActingPlayerHand = [...actingPlayer.hand, stolenCard];
+                const newActingPlayerHand = [...actingPlayer.hand, newStolenCard];
                 transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
             
                 // Remove the original card from the target's hand
@@ -866,3 +868,4 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
     
 
     
+
