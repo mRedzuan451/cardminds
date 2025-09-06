@@ -233,24 +233,22 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
 
         // Handle Power of 2 (**) by wrapping the preceding element/group in Math.pow
         let powerProcessedTerms: (string | number)[] = [];
-        for (let i = terms.length - 1; i >= 0; i--) {
+        for (let i = 0; i < terms.length; i++) {
             if (terms[i] === '**') {
-                const base = powerProcessedTerms.shift(); // The element to be squared
+                const base = powerProcessedTerms.pop(); // The element to be squared
 
                 if (typeof base === 'undefined') {
                     return { error: "Power operator must have a base." };
                 }
 
-                if (typeof base === 'number') {
-                     powerProcessedTerms.unshift(`Math.pow(${base}, 2)`);
-                } else if (typeof base === 'string' && base.startsWith('Math.pow')) {
-                     powerProcessedTerms.unshift(`Math.pow(${base}, 2)`);
+                if (typeof base === 'number' || (typeof base === 'string' && base.startsWith('Math.pow'))) {
+                     powerProcessedTerms.push(`Math.pow(${base}, 2)`);
                 } else if (base === ')') {
                     let parenCount = 1;
                     const expressionInParen: (string | number)[] = [')'];
                     
                     while (parenCount > 0 && powerProcessedTerms.length > 0) {
-                        const popped = powerProcessedTerms.shift()!;
+                        const popped = powerProcessedTerms.pop()!;
                         expressionInParen.unshift(popped);
                         if (popped === '(') parenCount--;
                         if (popped === ')') parenCount++;
@@ -259,12 +257,12 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
                     if (parenCount !== 0) {
                         return { error: "Mismatched parentheses with power operator." };
                     }
-                    powerProcessedTerms.unshift(`Math.pow(${expressionInParen.join(' ')}, 2)`);
+                    powerProcessedTerms.push(`Math.pow(${expressionInParen.join(' ')}, 2)`);
                 } else {
                      return { error: "Invalid base for power operator." };
                 }
             } else {
-                powerProcessedTerms.unshift(terms[i]);
+                powerProcessedTerms.push(terms[i]);
             }
         }
         terms = powerProcessedTerms;
