@@ -92,6 +92,7 @@ export const createGame = ai.defineFlow({ name: 'createGame', inputSchema: Creat
     players: [creatorId],
     maxPlayers: 8,
     deck: [],
+    discardPile: [],
     targetNumber: 0,
     targetCards: [],
     currentPlayerId: creatorId,
@@ -233,6 +234,7 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
     transaction.update(gameRef, {
         gameState: 'playerTurn',
         deck: freshDeck,
+        discardPile: [], // Start with an empty discard pile
         targetNumber: target,
         targetCards: cardsUsed,
         currentPlayerId: firstPlayerId,
@@ -378,6 +380,8 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         hand: newHand,
         passed: true, // Submitting also means you are done for the turn cycle
       });
+      // Move used cards to discard pile
+      transaction.update(gameRef, { discardPile: arrayUnion(...cardsUsed) });
 
     } else { // action === 'pass'
         console.log(`[playerAction] Player ${playerId} passed.`);
@@ -396,125 +400,132 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
 });
 
 export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
-  let playerToDiscard: string | null = null;
-
-  await runTransaction(db, async (transaction) => {
-    console.log(`[nextRound] Starting next round for game ${gameId}`);
-    // Read phase
-    const gameRef = doc(db, 'games', gameId);
-    const gameDoc = await transaction.get(gameRef);
-    if (!gameDoc.exists()) throw new Error("Game not found");
-    let game = gameDoc.data() as Game;
-    
-    const playersQuery = query(collection(db, 'games', gameId, 'players'));
-    const playerDocsSnap = await getDocs(playersQuery);
-    const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
-    const playerCount = players.length;
-    
-    // Check for game over conditions first
-    if (game.gameMode === 'special' && game.targetScore) {
-        const winner = players.find(p => p.totalScore >= game.targetScore!);
-        if (winner) {
-            console.log(`[nextRound] Game over! ${winner.name} reached the target score.`);
-            transaction.update(gameRef, { gameState: 'gameOver' });
-            return;
-        }
-    }
-    if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
-        console.log(`[nextRound] Game over by rounds. Setting state to 'gameOver'.`);
-        transaction.update(gameRef, { gameState: 'gameOver' });
-        return;
-    }
-
-    // Write phase
-    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount, game.allowedSpecialCards));
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
-    freshDeck = updatedDeck;
-    console.log(`[nextRound] New target: ${target}.`);
-    
-    const firstPlayerId = game.players[0];
-    
-    const dealtHands: Record<string, Card[]> = {};
-    
-    if (game.gameMode === 'special') {
-        // In special mode, players keep their hand and draw 3 new cards
-        for (const p of players) {
-            const newCards = freshDeck.splice(0, 3);
-            const newHand = [...p.hand, ...newCards];
-            dealtHands[p.id] = newHand; // Store for the first player draw logic
-            const playerRef = doc(db, 'games', gameId, 'players', p.id);
-            transaction.update(playerRef, { 
-                hand: newHand, 
-                roundScore: 0, 
-                passed: false, 
-                finalResult: 0, 
-                equation: [], 
-                cardsUsed: [] 
-            });
-
-            // Check for discard condition
-            if (newHand.length > 10 && !playerToDiscard) {
-                playerToDiscard = p.id;
-            }
-        }
-
-    } else {
-        // In other modes, deal 5 fresh cards
-        players.forEach(p => {
-            const hand = freshDeck.splice(0, 5);
-            dealtHands[p.id] = hand;
-            const playerRef = doc(db, 'games', gameId, 'players', p.id);
-            transaction.update(playerRef, { 
-                hand, 
-                roundScore: 0, 
-                passed: false, 
-                finalResult: 0, 
-                equation: [], 
-                cardsUsed: [] 
-            });
-        });
-    }
-
-    // Deal starting card to first player, but not in special mode
-    if ((game.gameMode === 'easy' || game.gameMode === 'pro') && freshDeck.length > 0) {
-      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayerHand = dealtHands[firstPlayerId];
-      if (firstPlayerHand) {
-          const newHand = [...firstPlayerHand, freshDeck.shift()!];
-          transaction.update(firstPlayerRef, { hand: newHand });
-          console.log(`[nextRound] Dealt starting card to first player ${firstPlayerId}.`);
+    let playerToDiscard: string | null = null;
+  
+    await runTransaction(db, async (transaction) => {
+      console.log(`[nextRound] Starting next round for game ${gameId}`);
+      // Read phase
+      const gameRef = doc(db, 'games', gameId);
+      const gameDoc = await transaction.get(gameRef);
+      if (!gameDoc.exists()) throw new Error("Game not found");
+      let game = gameDoc.data() as Game;
+      
+      const playersQuery = query(collection(db, 'games', gameId, 'players'));
+      const playerDocsSnap = await getDocs(playersQuery);
+      const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+      const playerCount = players.length;
+      
+      // Check for game over conditions first
+      if (game.gameMode === 'special' && game.targetScore > 0) {
+          const winner = players.find(p => p.totalScore >= game.targetScore);
+          if (winner) {
+              console.log(`[nextRound] Game over! ${winner.name} reached the target score.`);
+              transaction.update(gameRef, { gameState: 'gameOver' });
+              return;
+          }
       }
-    }
-
-    console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck.map(c => c.id));
-    
-    // Determine next game state
-    if (playerToDiscard) {
-        console.log(`[nextRound] Player ${playerToDiscard} must discard cards.`);
-        transaction.update(gameRef, {
-            gameState: 'discarding',
-            discardingPlayerId: playerToDiscard,
+      if (game.gameMode !== 'special' && game.currentRound >= game.totalRounds) {
+          console.log(`[nextRound] Game over by rounds. Setting state to 'gameOver'.`);
+          transaction.update(gameRef, { gameState: 'gameOver' });
+          return;
+      }
+  
+      // ===== DECK RESET LOGIC =====
+      // Collect all cards from player hands, discard pile, and remaining deck
+      let allCardsInPlay: Card[] = [...game.deck, ...(game.discardPile || [])];
+      players.forEach(p => {
+          allCardsInPlay.push(...p.hand);
+          // Clear player's hand and results for the new round
+          const playerRef = doc(db, 'games', gameId, 'players', p.id);
+          transaction.update(playerRef, {
+            hand: [],
+            roundScore: 0,
+            passed: false,
+            finalResult: 0,
+            equation: [],
+            cardsUsed: [],
+          });
+      });
+  
+      // Shuffle all cards back into a new deck
+      let freshDeck = shuffleDeck(allCardsInPlay);
+      console.log(`[nextRound] Re-shuffled ${freshDeck.length} cards into the deck.`);
+      
+      // Generate new target
+      const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
+      freshDeck = updatedDeck;
+      console.log(`[nextRound] New target: ${target}.`);
+      
+      const firstPlayerId = game.players[0];
+      
+      const dealtHands: Record<string, Card[]> = {};
+      
+      if (game.gameMode === 'special') {
+          // In special mode, players draw 3 new cards
+          for (const p of players) {
+              const newCards = freshDeck.splice(0, 3);
+              dealtHands[p.id] = newCards; // Store for the first player draw logic
+              const playerRef = doc(db, 'games', gameId, 'players', p.id);
+              transaction.update(playerRef, { hand: newCards });
+  
+              // Check for discard condition
+              if (newCards.length > 10 && !playerToDiscard) {
+                  playerToDiscard = p.id;
+              }
+          }
+  
+      } else {
+          // In other modes, deal 5 fresh cards
+          players.forEach(p => {
+              const hand = freshDeck.splice(0, 5);
+              dealtHands[p.id] = hand;
+              const playerRef = doc(db, 'games', gameId, 'players', p.id);
+              transaction.update(playerRef, { hand });
+          });
+      }
+  
+      // Deal starting card to first player, but not in special mode
+      if ((game.gameMode === 'easy' || game.gameMode === 'pro') && freshDeck.length > 0) {
+        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+        const firstPlayerHand = dealtHands[firstPlayerId];
+        if (firstPlayerHand) {
+            const newHand = [...firstPlayerHand, freshDeck.shift()!];
+            transaction.update(firstPlayerRef, { hand: newHand });
+            console.log(`[nextRound] Dealt starting card to first player ${firstPlayerId}.`);
+        }
+      }
+  
+      console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck.map(c => c.id));
+      
+      // Determine next game state
+      if (playerToDiscard) {
+          console.log(`[nextRound] Player ${playerToDiscard} must discard cards.`);
+          transaction.update(gameRef, {
+              gameState: 'discarding',
+              discardingPlayerId: playerToDiscard,
+              deck: freshDeck,
+              discardPile: cardsUsed,
+              targetNumber: target,
+              targetCards: cardsUsed,
+              currentPlayerId: playerToDiscard, // The player discarding is the current player
+              currentRound: game.currentRound + 1,
+              roundWinnerIds: [],
+          });
+      } else {
+          transaction.update(gameRef, {
+            gameState: 'playerTurn',
             deck: freshDeck,
+            discardPile: cardsUsed,
             targetNumber: target,
             targetCards: cardsUsed,
-            currentPlayerId: playerToDiscard, // The player discarding is the current player
+            currentPlayerId: game.players[0],
             currentRound: game.currentRound + 1,
             roundWinnerIds: [],
-        });
-    } else {
-        transaction.update(gameRef, {
-          gameState: 'playerTurn',
-          deck: freshDeck,
-          targetNumber: target,
-          targetCards: cardsUsed,
-          currentPlayerId: game.players[0],
-          currentRound: game.currentRound + 1,
-          roundWinnerIds: [],
-        });
-        console.log(`[nextRound] Round ${game.currentRound + 1} started.`);
-    }
+          });
+          console.log(`[nextRound] Round ${game.currentRound + 1} started.`);
+      }
+    });
   });
-});
 
 export const discardCards = ai.defineFlow({ name: 'discardCards', inputSchema: DiscardCardsInputSchema }, async ({ gameId, playerId, cardsToDiscard }) => {
     await runTransaction(db, async (transaction) => {
@@ -543,6 +554,7 @@ export const discardCards = ai.defineFlow({ name: 'discardCards', inputSchema: D
         
         transaction.update(playerRef, { hand: newHand });
         transaction.update(gameRef, {
+            discardPile: arrayUnion(...cardsToDiscard), // Add discarded cards to the pile
             gameState: 'playerTurn',
             discardingPlayerId: null,
             currentPlayerId: game.players[0] // Start turn from the first player in the list
@@ -580,6 +592,7 @@ export const rematch = ai.defineFlow({ name: 'rematch', inputSchema: GameIdInput
       players: oldGameData.players,
       maxPlayers: oldGameData.maxPlayers,
       deck: [],
+      discardPile: [],
       targetNumber: 0,
       targetCards: [],
       currentPlayerId: oldGameData.creatorId,
@@ -638,6 +651,7 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
             
             transaction.update(playerRef, { hand: shuffledHand });
             transaction.update(gameRef, {
+                discardPile: arrayUnion(card), // Discard the shuffle card
                 lastSpecialCardPlay: {
                     cardRank: 'SH',
                     playerName: player.name,
@@ -652,6 +666,7 @@ export const playSpecialCard = ai.defineFlow({ name: 'playSpecialCard', inputSch
              newHand.splice(cardIndex, 1);
              transaction.update(playerRef, { hand: newHand });
              transaction.update(gameRef, { 
+                discardPile: arrayUnion(card), // Discard the played special card
                 gameState: 'specialAction',
                 specialAction: {
                     playerId,
@@ -686,9 +701,15 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 if (!playerDoc.exists()) throw new Error("Player not found");
                 const player = playerDoc.data() as Player;
                 const originalCard = target as Card;
+
+                // Find the original card in the discard pile to clone from
+                 const cardToClone = (game.discardPile || []).find(c => c.id === originalCard.id);
+                 if (!cardToClone) throw new Error("Card to clone not found in discard pile.");
+
+
                 const clonedCard: Card = { 
-                    ...originalCard, 
-                    id: `cloned-${originalCard.id}-${Date.now()}` 
+                    ...cardToClone, 
+                    id: `cloned-${cardToClone.id}-${Date.now()}` 
                 };
                 const newHand = [...player.hand, clonedCard];
                 transaction.update(playerRef, { hand: newHand });
@@ -724,20 +745,14 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
             
                 // Steal a random card
                 const cardToStealIndex = Math.floor(Math.random() * targetPlayer.hand.length);
-                const stolenCardOriginal = targetPlayer.hand[cardToStealIndex];
+                const stolenCard = targetPlayer.hand[cardToStealIndex];
             
-                // Create a unique clone for the acting player
-                const stolenCardClone: Card = {
-                    ...stolenCardOriginal,
-                    id: `stolen-${stolenCardOriginal.id}-${Date.now()}`
-                };
-            
-                // Add the new card to the acting player's hand
-                const newActingPlayerHand = [...actingPlayer.hand, stolenCardClone];
+                // Add the stolen card to the acting player's hand
+                const newActingPlayerHand = [...actingPlayer.hand, stolenCard];
                 transaction.update(actingPlayerRef, { hand: newActingPlayerHand });
             
                 // Remove the original card from the target's hand
-                const newTargetHand = targetPlayer.hand.filter((c) => c.id !== stolenCardOriginal.id);
+                const newTargetHand = targetPlayer.hand.filter((c) => c.id !== stolenCard.id);
                 transaction.update(targetPlayerRef, { hand: newTargetHand });
             
                 lastPlayUpdate.lastSpecialCardPlay = {
@@ -762,6 +777,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 
                 // Remove the card from the deck and use it
                 const newCard = newDeck.splice(replacementCardIndex, 1)[0];
+                const oldCard = game.targetCards[targetCardIndex];
 
                 const newTargetCards = [...game.targetCards];
                 newTargetCards[targetCardIndex] = newCard;
@@ -778,6 +794,7 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                     targetCards: newTargetCards,
                     targetNumber: newTargetNumber,
                     deck: newDeck,
+                    discardPile: arrayUnion(oldCard), // Put the old target card in the discard
                     lastSpecialCardPlay: {
                         cardRank: 'DE',
                         playerName: actingPlayer.name,
@@ -810,6 +827,8 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
+
+    
 
     
 

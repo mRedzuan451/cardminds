@@ -552,8 +552,8 @@ const renderDiscardUI = () => {
   const isGameOver = useMemo(() => {
       if (!game || !players) return false;
       if (game.gameState === 'gameOver') return true;
-      if (game.gameMode === 'special' && game.targetScore) {
-          return players.some(p => p.totalScore >= game.targetScore!);
+      if (game.gameMode === 'special' && game.targetScore > 0) {
+          return players.some(p => p.totalScore >= game.targetScore);
       }
       return game.gameMode !== 'special' && game.currentRound >= game.totalRounds;
   }, [game, players]);
@@ -902,3 +902,5 @@ const renderDiscardUI = () => {
     </div>
   );
 }
+
+    

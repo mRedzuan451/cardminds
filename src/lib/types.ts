@@ -36,6 +36,7 @@ export interface Game {
     players: string[]; // list of player IDs
     maxPlayers: number;
     deck: Card[];
+    discardPile: Card[];
     targetNumber: number;
     targetCards: Card[];
     currentPlayerId: string;
@@ -57,3 +58,5 @@ export interface Game {
         timestamp: number;
     } | null;
 }
+
+    
