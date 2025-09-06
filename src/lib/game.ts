@@ -230,44 +230,46 @@ export function evaluateEquation(equation: EquationTerm[], mode: GameMode): numb
             }
             terms = newTerms;
         }
+        
+        // Convert to a string expression first, which is easier to manipulate for operators
+        let expressionStr = terms.join(' ');
+        
+        // Handle Power of 2 (**) by replacing it with Math.pow.
+        // This is tricky. We need to find what the base of the power is.
+        // It could be a number, or a parenthesized expression.
+        while (expressionStr.includes('**')) {
+            const powerIndex = expressionStr.indexOf('**');
+            const beforePower = expressionStr.substring(0, powerIndex).trim();
 
-        // Handle Power of 2 (**) by wrapping the preceding element/group in Math.pow
-        let powerProcessedTerms: (string | number)[] = [];
-        for (let i = 0; i < terms.length; i++) {
-            if (terms[i] === '**') {
-                const base = powerProcessedTerms.pop(); // The element to be squared
+            let base = '';
+            let startIndex = -1;
 
-                if (typeof base === 'undefined') {
-                    return { error: "Power operator must have a base." };
-                }
-
-                if (typeof base === 'number' || (typeof base === 'string' && base.startsWith('Math.pow'))) {
-                     powerProcessedTerms.push(`Math.pow(${base}, 2)`);
-                } else if (base === ')') {
-                    let parenCount = 1;
-                    const expressionInParen: (string | number)[] = [')'];
-                    
-                    while (parenCount > 0 && powerProcessedTerms.length > 0) {
-                        const popped = powerProcessedTerms.pop()!;
-                        expressionInParen.unshift(popped);
-                        if (popped === '(') parenCount--;
-                        if (popped === ')') parenCount++;
+            if (beforePower.endsWith(')')) {
+                // It's a parenthesized expression. Find the matching opening parenthesis.
+                let parenCount = 0;
+                for (let i = beforePower.length - 1; i >= 0; i--) {
+                    if (beforePower[i] === ')') parenCount++;
+                    if (beforePower[i] === '(') parenCount--;
+                    if (parenCount === 0) {
+                        startIndex = i;
+                        break;
                     }
-
-                    if (parenCount !== 0) {
-                        return { error: "Mismatched parentheses with power operator." };
-                    }
-                    powerProcessedTerms.push(`Math.pow(${expressionInParen.join(' ')}, 2)`);
-                } else {
-                     return { error: "Invalid base for power operator." };
                 }
+                if (startIndex === -1) return { error: "Mismatched parentheses with power operator." };
+                base = beforePower.substring(startIndex);
             } else {
-                powerProcessedTerms.push(terms[i]);
+                // It's a number. Find the start of the number.
+                const match = beforePower.match(/[\d\.]+$/);
+                if (!match) return { error: "Power operator must have a base." };
+                base = match[0];
+                startIndex = beforePower.length - base.length;
             }
-        }
-        terms = powerProcessedTerms;
 
-        const expression = terms.join(' ').replace(/\s{2,}/g, ' ');
+            const replacement = `Math.pow(${base}, 2)`;
+            expressionStr = expressionStr.substring(0, startIndex) + replacement + expressionStr.substring(powerIndex + 2);
+        }
+
+        const expression = expressionStr.replace(/\s{2,}/g, ' ');
 
         // Final validation before eval
         const openParen = (expression.match(/\(/g) || []).length;

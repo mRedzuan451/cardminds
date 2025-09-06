@@ -433,19 +433,10 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       // ===== DECK RESET LOGIC =====
       // Collect all cards from player hands, discard pile, and remaining deck
       let allCardsInPlay: Card[] = [...game.deck, ...(game.discardPile || [])];
-      players.forEach(p => {
+      for (const p of players) {
           allCardsInPlay.push(...p.hand);
-          // Clear player's hand and results for the new round
-          const playerRef = doc(db, 'games', gameId, 'players', p.id);
-          transaction.update(playerRef, {
-            hand: [],
-            roundScore: 0,
-            passed: false,
-            finalResult: 0,
-            equation: [],
-            cardsUsed: [],
-          });
-      });
+      }
+      allCardsInPlay = allCardsInPlay.concat(game.targetCards); // also include target cards
   
       // Shuffle all cards back into a new deck
       let freshDeck = shuffleDeck(allCardsInPlay);
@@ -460,28 +451,35 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       
       const dealtHands: Record<string, Card[]> = {};
       
-      if (game.gameMode === 'special') {
-          // In special mode, players draw 3 new cards
-          for (const p of players) {
-              const newCards = freshDeck.splice(0, 3);
-              dealtHands[p.id] = newCards; // Store for the first player draw logic
-              const playerRef = doc(db, 'games', gameId, 'players', p.id);
-              transaction.update(playerRef, { hand: newCards });
-  
-              // Check for discard condition
-              if (newCards.length > 10 && !playerToDiscard) {
-                  playerToDiscard = p.id;
-              }
-          }
-  
-      } else {
-          // In other modes, deal 5 fresh cards
-          players.forEach(p => {
-              const hand = freshDeck.splice(0, 5);
-              dealtHands[p.id] = hand;
-              const playerRef = doc(db, 'games', gameId, 'players', p.id);
-              transaction.update(playerRef, { hand });
-          });
+      // Reset players for new round
+      for (const p of players) {
+        const playerRef = doc(db, 'games', gameId, 'players', p.id);
+        
+        // Reset player state for the new round
+        transaction.update(playerRef, {
+            roundScore: 0,
+            passed: false,
+            finalResult: 0,
+            equation: [],
+            cardsUsed: [],
+        });
+    
+        if (game.gameMode === 'special') {
+            const newCards = freshDeck.splice(0, 3);
+            const currentHand = p.hand || []; // Make sure hand exists
+            const combinedHand = [...currentHand, ...newCards];
+            dealtHands[p.id] = combinedHand;
+            transaction.update(playerRef, { hand: combinedHand });
+    
+            if (combinedHand.length > 10 && !playerToDiscard) {
+                playerToDiscard = p.id;
+            }
+        } else {
+            // In easy/pro, they get a fresh hand of 5
+            const newHand = freshDeck.splice(0, 5);
+            dealtHands[p.id] = newHand;
+            transaction.update(playerRef, { hand: newHand });
+        }
       }
   
       // Deal starting card to first player, but not in special mode
@@ -515,7 +513,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
           transaction.update(gameRef, {
             gameState: 'playerTurn',
             deck: freshDeck,
-            discardPile: cardsUsed,
+            discardPile: cardsUsed, // The cards used for the new target are the start of the pile
             targetNumber: target,
             targetCards: cardsUsed,
             currentPlayerId: game.players[0],
@@ -735,9 +733,9 @@ export const resolveSpecialCard = ai.defineFlow({ name: 'resolveSpecialCard', in
                 const player = playerDoc.data() as Player;
                 const originalCard = target as Card;
 
-                // Find the original card in the discard pile to clone from
-                 const cardToClone = (game.discardPile || []).find(c => c.id === originalCard.id);
-                 if (!cardToClone) throw new Error("Card to clone not found in discard pile.");
+                // Find the original card in the hand to clone
+                 const cardToClone = player.hand.find(c => c.id === originalCard.id);
+                 if (!cardToClone) throw new Error("Card to clone not found in your hand.");
 
 
                 const clonedCard: Card = { 
@@ -862,10 +860,3 @@ export const endSpecialAction = ai.defineFlow({ name: 'endSpecialAction', inputS
         specialAction: null
     });
 });
-
-    
-
-    
-
-    
-
