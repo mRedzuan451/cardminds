@@ -34,7 +34,7 @@ import { ShuffleAnimation } from './shuffle-animation';
 const db = getFirestore(firebaseApp);
 
 
-function SpecialCardConfig({ game, onSave, onCancel }: { game: Game, onSave: (allowed: Rank[]) => void, onCancel: () => void }) {
+function SpecialCardConfig({ game, onSave, onCancel, toast }: { game: Game, onSave: (allowed: Rank[]) => void, onCancel: () => void, toast: (options: any) => void }) {
     const [selectedCards, setSelectedCards] = useState<Set<Rank>>(new Set(game.allowedSpecialCards ?? SPECIAL_RANKS));
     const CARD_VALUES = getCardValues('special');
     const MAX_SPECIAL_CARDS = 4;
@@ -611,6 +611,7 @@ const renderDiscardUI = () => {
                 game={game}
                 onSave={handleSaveSpecialConfig}
                 onCancel={() => setIsSpecialConfigOpen(false)}
+                toast={toast}
             />
         )}
         <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95 w-full max-w-lg">
@@ -936,3 +937,5 @@ const renderDiscardUI = () => {
     </div>
   );
 }
+
+    
