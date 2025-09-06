@@ -431,16 +431,26 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       }
   
       // ===== DECK RESET LOGIC =====
-      // Collect all cards from player hands, discard pile, and remaining deck
-      let allCardsInPlay: Card[] = [...game.deck, ...(game.discardPile || [])];
-      for (const p of players) {
-          allCardsInPlay.push(...p.hand);
-      }
-      allCardsInPlay = allCardsInPlay.concat(game.targetCards); // also include target cards
-  
-      // Shuffle all cards back into a new deck
-      let freshDeck = shuffleDeck(allCardsInPlay);
-      console.log(`[nextRound] Re-shuffled ${freshDeck.length} cards into the deck.`);
+      // Collect all cards from player hands, discard pile, remaining deck, and target cards
+      const allCardsInPlay: Card[] = [
+        ...(game.deck || []),
+        ...(game.discardPile || []),
+        ...(game.targetCards || []),
+        ...players.flatMap(p => p.hand || [])
+      ];
+
+      // Deduplicate cards to ensure we have a clean set
+      const uniqueCardsMap = new Map<string, Card>();
+      allCardsInPlay.forEach(card => {
+          if (card && card.id) { // Ensure card and card.id are not null/undefined
+              uniqueCardsMap.set(card.id, card);
+          }
+      });
+      const uniqueCards = Array.from(uniqueCardsMap.values());
+      
+      // Shuffle all unique cards back into a new deck
+      let freshDeck = shuffleDeck(uniqueCards);
+      console.log(`[nextRound] Re-shuffled ${freshDeck.length} unique cards into the deck.`);
       
       // Generate new target
       const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
