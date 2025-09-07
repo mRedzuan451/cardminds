@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDocument, useCollection } from 'react-firebase-hooks/firestore';
-import { doc, collection, onSnapshot, getFirestore } from 'firebase/firestore';
+import { doc, collection, onSnapshot, getFirestore, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GameCard } from '@/components/game-card';
@@ -114,7 +114,6 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   const [hasJoined, setHasJoined] = useState(false);
   const [selectedToDiscard, setSelectedToDiscard] = useState<Set<string>>(new Set());
   const [isSpecialConfigOpen, setIsSpecialConfigOpen] = useState(false);
-  const [showShuffle, setShowShuffle] = useState(false);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -331,10 +330,11 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
        return;
     }
 
-    setShowShuffle(true);
+    const gameRef = doc(db, 'games', gameId);
+    await updateDoc(gameRef, { gameState: 'shuffling' });
+    
     setTimeout(async () => {
         await gameActions.startGame({ gameId });
-        setShowShuffle(false);
     }, 3000);
   };
   
@@ -600,10 +600,11 @@ const renderDiscardUI = () => {
     );
   }
 
+  if (game.gameState === 'shuffling') {
+    return <ShuffleAnimation />;
+  }
+  
   if (game.gameState === 'lobby') {
-    if (showShuffle) {
-        return <ShuffleAnimation />;
-    }
     return (
       <div className="container mx-auto p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-150px)]">
         {isSpecialConfigOpen && localPlayer.id === game.creatorId && (
@@ -937,5 +938,3 @@ const renderDiscardUI = () => {
     </div>
   );
 }
-
-    

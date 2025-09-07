@@ -26,7 +26,7 @@ export interface Player {
     cardsUsed?: Card[];
 }
 
-export type GameState = 'lobby' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction' | 'discarding';
+export type GameState = 'lobby' | 'shuffling' | 'playerTurn' | 'roundOver' | 'gameOver' | 'specialAction' | 'discarding';
 
 export interface Game {
     id: string;
@@ -58,5 +58,3 @@ export interface Game {
         timestamp: number;
     } | null;
 }
-
-    
