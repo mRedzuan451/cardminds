@@ -33,7 +33,7 @@ body {
     --gradient-end: 260 10% 12%;
     --background: 285 10% 10%;
     --foreground: 263 100% 95%;
-    --card: 285 10% 14%;
+    --card: 285 10% 20%;
     --card-foreground: 263 100% 95%;
     --popover: 285 10% 10%;
     --popover-foreground: 263 100% 95%;
@@ -71,7 +71,7 @@ body {
     --gradient-end: 260 10% 12%;
     --background: 285 10% 10%;
     --foreground: 263 100% 95%;
-    --card: 285 10% 14%;
+    --card: 285 10% 20%;
     --card-foreground: 263 100% 95%;
     --popover: 285 10% 10%;
     --popover-foreground: 263 100% 95%;
