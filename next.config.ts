@@ -1,8 +1,8 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ['handlebars', 'dotprompt', 'genkit', '@genkit-ai/core'],
   typescript: {
     ignoreBuildErrors: true,
   },
