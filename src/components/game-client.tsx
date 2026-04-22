@@ -593,10 +593,18 @@ const renderDiscardUI = () => {
 
     if (totalWinner.length > 1) {
       return (
-        <div className="game-panel border border-white/10 bg-gradient-to-r from-purple-500/15 via-fuchsia-500/10 to-indigo-500/15 px-6 py-5 shadow-xl">
-          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Total Winner</p>
-          <p className="mt-2 text-3xl md:text-4xl font-headline text-primary">It&apos;s a tie for the championship!</p>
-          <p className="mt-2 text-lg text-muted-foreground">{totalWinner.map(player => player.name).join(' • ')}</p>
+        <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-r from-purple-500/20 via-fuchsia-500/15 to-indigo-500/20 px-6 py-7 shadow-2xl">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_45%)]" />
+          <div className="relative flex flex-col items-center gap-3 text-center">
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-4 py-2 backdrop-blur-sm">
+              <Trophy className="h-5 w-5 text-amber-300" />
+              <span className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Total Winner</span>
+            </div>
+            <p className="text-4xl md:text-5xl font-headline text-primary">It&apos;s a tie for the championship!</p>
+            <p className="text-lg md:text-xl text-muted-foreground">
+              {totalWinner.map(player => player.name).join(' • ')}
+            </p>
+          </div>
         </div>
       );
     }
@@ -604,13 +612,16 @@ const renderDiscardUI = () => {
     const winner = totalWinner[0];
 
     return (
-      <div className="relative overflow-hidden rounded-[28px] border border-primary/30 bg-gradient-to-r from-primary/20 via-fuchsia-500/15 to-amber-500/20 px-6 py-6 shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_45%)]" />
-        <div className="relative flex flex-col items-center gap-2 text-center">
-          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Total Winner</p>
-          <p className="text-4xl md:text-5xl font-headline text-primary drop-shadow-sm">{winner.name}</p>
-          <p className="text-lg text-muted-foreground">
-            Champion of the match with <span className="text-primary font-bold">{winner.totalScore}</span> total points
+      <div className="relative overflow-hidden rounded-[36px] border border-primary/30 bg-gradient-to-r from-primary/25 via-fuchsia-500/15 to-amber-500/25 px-6 py-8 shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.22),_transparent_45%)]" />
+        <div className="relative flex flex-col items-center gap-4 text-center">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-5 py-2.5 backdrop-blur-sm">
+            <Trophy className="h-6 w-6 text-amber-300" />
+            <span className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Total Winner</span>
+          </div>
+          <p className="text-5xl md:text-6xl font-headline text-primary drop-shadow-sm">{winner.name}</p>
+          <p className="max-w-2xl text-lg md:text-xl text-muted-foreground">
+            Champion of the match with <span className="text-primary font-bold">{winner.totalScore}</span> total points.
           </p>
         </div>
       </div>
