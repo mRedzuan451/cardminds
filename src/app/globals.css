@@ -16,11 +16,11 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  animation: gradient 24s ease infinite;
-  background-size: 300% 300%;
+  animation: gradient 28s ease infinite;
+  background-size: 260% 260%;
   background-image:
-    radial-gradient(circle at top, hsl(var(--primary) / 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, hsl(var(--accent) / 0.10), transparent 30%),
+    radial-gradient(circle at top, hsl(var(--primary) / 0.12), transparent 38%),
+    radial-gradient(circle at bottom right, hsl(var(--accent) / 0.08), transparent 34%),
     linear-gradient(
       -45deg,
       hsl(var(--gradient-start)),
@@ -127,5 +127,9 @@ body {
 
   .game-chip {
     @apply rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-foreground/90 shadow-sm backdrop-blur;
+  }
+
+  .game-card-stack {
+    @apply flex items-center justify-center gap-3 flex-wrap md:flex-nowrap;
   }
 }

@@ -59,7 +59,7 @@ function SpecialCardConfig({ game, onSave, onCancel, toast }: { game: Game, onSa
 
     return (
         <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="game-surface max-w-3xl">
                 <DialogHeader>
                     <DialogTitle className="font-headline text-2xl">Configure Special Cards</DialogTitle>
                     <DialogDescription>
@@ -68,14 +68,17 @@ function SpecialCardConfig({ game, onSave, onCancel, toast }: { game: Game, onSa
                 </DialogHeader>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
                     {SPECIAL_RANKS.map(rank => (
-                        <div key={rank} className="flex flex-col items-center gap-2">
+                        <div key={rank} className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-3">
                              <GameCard
                                 card={{ id: rank, suit: 'Special', rank }}
                                 mode="special"
                                 onClick={() => handleToggle(rank)}
-                                className={cn(!selectedCards.has(rank) && "opacity-50 grayscale")}
+                                className={cn(
+                                    "transition-all duration-200",
+                                    !selectedCards.has(rank) && "opacity-50 grayscale scale-95"
+                                )}
                             />
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 rounded-full border border-white/10 bg-background/40 px-3 py-1">
                                 <Checkbox
                                     id={`check-${rank}`}
                                     checked={selectedCards.has(rank)}
@@ -93,7 +96,7 @@ function SpecialCardConfig({ game, onSave, onCancel, toast }: { game: Game, onSa
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-                    <Button onClick={handleSave}>Save Configuration</Button>
+                    <Button onClick={handleSave} className="shadow-lg">Save Configuration</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -463,14 +466,14 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
     return (
         <AlertDialog open={true}>
-            <AlertDialogContent>
+            <AlertDialogContent className="game-surface max-w-3xl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Play {CARD_VALUES[cardRank as Rank]} Card</AlertDialogTitle>
+                    <AlertDialogTitle className="font-headline text-2xl">Play {CARD_VALUES[cardRank as Rank]} Card</AlertDialogTitle>
                 </AlertDialogHeader>
                  {cardRank === 'GA' && (
-                    <div>
-                        <p>Select a card from your hand to discard:</p>
-                        <div className="flex flex-wrap gap-2 mt-2 max-h-60 overflow-y-auto">
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground">Select a card from your hand to discard:</p>
+                        <div className="flex flex-wrap gap-3 mt-2 max-h-60 overflow-y-auto justify-center">
                             {activeHand.map((card) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
                             ))}
@@ -478,9 +481,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     </div>
                 )}
                 {cardRank === 'CL' && (
-                    <div>
-                        <p>Select a non-special card from your hand to clone:</p>
-                        <div className="flex flex-wrap gap-2 mt-2 max-h-60 overflow-y-auto">
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground">Select a non-special card from your hand to clone:</p>
+                        <div className="flex flex-wrap gap-3 mt-2 max-h-60 overflow-y-auto justify-center">
                             {activeHand.filter(c => c.suit !== 'Special').map((card) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(card)} />
                             ))}
@@ -488,19 +491,22 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
                     </div>
                 )}
                 {cardRank === 'SB' && (
-                     <div>
-                        <p>Select a player to sabotage:</p>
+                     <div className="space-y-3">
+                        <p className="text-muted-foreground">Select a player to sabotage:</p>
                         <div className="flex flex-col gap-2 mt-2">
                              {players?.filter(p => p.id !== localPlayer?.id).map(p => (
-                                 <Button key={p.id} onClick={() => handleSpecialAction(p.id)}>{p.name}</Button>
+                                 <Button key={p.id} onClick={() => handleSpecialAction(p.id)} variant="outline" className="justify-between border-white/10 bg-white/5">
+                                    {p.name}
+                                    <span className="text-xs text-muted-foreground">Target</span>
+                                 </Button>
                              ))}
                         </div>
                      </div>
                 )}
                  {cardRank === 'DE' && (
-                    <div>
-                        <p>Select a target card to re-roll:</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground">Select a target card to re-roll:</p>
+                        <div className="flex flex-wrap gap-3 mt-2 justify-center">
                             {game.targetCards.map((card, index) => (
                                 <GameCard key={card.id} card={card} mode={game.gameMode} onClick={() => handleSpecialAction(index)} />
                             ))}
@@ -520,23 +526,23 @@ const renderDiscardUI = () => {
 
     return (
         <AlertDialog open={true}>
-            <AlertDialogContent>
+            <AlertDialogContent className="game-surface max-w-3xl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Too Many Cards!</AlertDialogTitle>
+                    <AlertDialogTitle className="font-headline text-2xl">Too Many Cards!</AlertDialogTitle>
                     <AlertDialogDescription>
                         Your hand has more than 10 cards. Please select exactly 3 cards to discard.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <div>
+                <div className="space-y-3">
                     <p className="mb-2 font-bold">Selected: {selectedToDiscard.size} / 3</p>
-                    <div className="flex flex-wrap gap-2 justify-center max-h-64 overflow-y-auto">
+                    <div className="flex flex-wrap gap-3 justify-center max-h-64 overflow-y-auto">
                         {activeHand.map((card) => (
                             <GameCard
                                 key={card.id}
                                 card={card}
                                 mode={game?.gameMode}
                                 onClick={() => handleDiscardCardClick(card)}
-                                className={cn(selectedToDiscard.has(card.id) && "ring-4 ring-offset-2 ring-primary")}
+                                className={cn(selectedToDiscard.has(card.id) && "ring-4 ring-offset-2 ring-primary scale-105")}
                             />
                         ))}
                     </div>
@@ -545,6 +551,7 @@ const renderDiscardUI = () => {
                     <Button
                         disabled={selectedToDiscard.size !== 3}
                         onClick={handleConfirmDiscard}
+                        className="shadow-lg"
                     >
                         Confirm Discard
                     </Button>
@@ -615,21 +622,21 @@ const renderDiscardUI = () => {
                 toast={toast}
             />
         )}
-        <Card className="text-center p-8 shadow-2xl animate-in fade-in-50 zoom-in-95 w-full max-w-lg">
-          <CardHeader>
+        <Card className="game-surface text-center p-8 animate-in fade-in-50 zoom-in-95 w-full max-w-2xl">
+          <CardHeader className="space-y-2">
             <CardTitle className="text-4xl font-headline">Game Lobby</CardTitle>
             <CardDescription className="text-lg">Waiting for players to join...</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-8">
             <div className="space-y-4">
-              <Button onClick={copyGameId} variant="outline" className="w-full text-lg">
+              <Button onClick={copyGameId} variant="outline" className="w-full text-lg border-white/10 bg-white/5 shadow-sm">
                 <Copy className="mr-2 h-5 w-5" /> Game ID: {gameId}
               </Button>
             </div>
              <div className="space-y-4">
               <h3 className="text-2xl font-bold">Players ({players.length}/{game.maxPlayers})</h3>
               <div className="grid gap-2">
-                {players.map(p => <div key={p.id} className="text-xl p-2 bg-muted rounded-md">{p.name} {p.id === game.creatorId && '(Creator)'} {p.id === localPlayer.id && '(You)'}</div>)}
+                {players.map(p => <div key={p.id} className="game-panel flex items-center justify-between px-4 py-3 text-lg">{p.name} <span className="text-sm text-muted-foreground">{p.id === game.creatorId && 'Creator'} {p.id === localPlayer.id && 'You'}</span></div>)}
               </div>
             </div>
             {localPlayer.id === game.creatorId && (
@@ -640,7 +647,7 @@ const renderDiscardUI = () => {
                     onClick={() => handleSetGameMode('easy')}
                     size="lg"
                     variant={game.gameMode === 'easy' ? 'default' : 'outline'}
-                    className="h-24 text-2xl"
+                    className="h-24 text-2xl shadow-lg"
                   >
                     <Baby className="mr-4 h-8 w-8" />
                     Easy
@@ -649,7 +656,7 @@ const renderDiscardUI = () => {
                     onClick={() => handleSetGameMode('pro')}
                     size="lg"
                     variant={game.gameMode === 'pro' ? 'default' : 'outline'}
-                    className="h-24 text-2xl border-destructive text-destructive data-[variant=default]:bg-destructive data-[variant=default]:text-destructive-foreground"
+                    className="h-24 text-2xl border-destructive text-destructive shadow-lg data-[variant=default]:bg-destructive data-[variant=default]:text-destructive-foreground"
                   >
                     <BrainCircuit className="mr-4 h-8 w-8" />
                     Pro
@@ -659,13 +666,13 @@ const renderDiscardUI = () => {
                         onClick={() => handleSetGameMode('special')}
                         size="lg"
                         variant={game.gameMode === 'special' ? 'default' : 'outline'}
-                        className="h-24 text-2xl w-full border-amber-500 text-amber-500 data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
+                        className="h-24 text-2xl w-full border-amber-500 text-amber-500 shadow-lg data-[variant=default]:bg-amber-500 data-[variant=default]:text-white"
                     >
                         <Sparkles className="mr-4 h-8 w-8" />
                         Special
                     </Button>
                     {game.gameMode === 'special' && (
-                        <Button onClick={() => setIsSpecialConfigOpen(true)} size="icon" className="absolute -top-2 -right-2 h-8 w-8 rounded-full">
+                        <Button onClick={() => setIsSpecialConfigOpen(true)} size="icon" className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg">
                             <Settings className="h-5 w-5" />
                         </Button>
                     )}
@@ -674,10 +681,10 @@ const renderDiscardUI = () => {
               </div>
             )}
             <div className="flex flex-col md:flex-row gap-4">
-              <Button onClick={handleStartGame} size="lg" className="text-2xl flex-grow" disabled={localPlayer.id !== game.creatorId}>
+              <Button onClick={handleStartGame} size="lg" className="text-2xl flex-grow shadow-lg" disabled={localPlayer.id !== game.creatorId}>
                 Start Game
               </Button>
-               <Button onClick={handleBackToMenu} size="lg" className="text-2xl flex-grow" variant="outline">
+               <Button onClick={handleBackToMenu} size="lg" className="text-2xl flex-grow shadow-lg" variant="outline">
                 <ArrowLeft className="mr-2 h-5 w-5"/> Menu
               </Button>
             </div>
@@ -792,12 +799,12 @@ const renderDiscardUI = () => {
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-background/50 p-3 min-h-[60px] text-xl font-bold flex-wrap shadow-inner">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
-              <div className={cn("grid grid-cols-2 gap-2", (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden")}>
+            <div className="flex flex-col gap-3 mt-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className={cn("grid grid-cols-2 gap-2 self-start", (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden")}> 
                 <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
                 <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
-              <div className="grid grid-cols-3 gap-2 w-full md:w-auto">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 w-full lg:w-auto">
                 <Button onClick={handleSubmitEquation} className="flex-grow shadow-lg" size="lg" disabled={equation.length === 0}>
                   <Send className="mr-2 h-4 w-4"/> Submit
                 </Button>
@@ -858,7 +865,7 @@ const renderDiscardUI = () => {
             Your Hand
           </h2>
           <div className="game-surface flex flex-col items-center gap-4 px-4 py-6 md:px-6">
-            <div className="flex justify-center -space-x-12">
+            <div className="game-card-stack md:-space-x-12">
               {handRow1.map((card, index) => (
                 <div
                   key={card.id}
@@ -883,7 +890,7 @@ const renderDiscardUI = () => {
               ))}
             </div>
             {handRow2.length > 0 && (
-              <div className="flex justify-center -space-x-12">
+              <div className="game-card-stack md:-space-x-12">
                 {handRow2.map((card, index) => (
                   <div
                     key={card.id}

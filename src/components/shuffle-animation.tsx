@@ -8,8 +8,13 @@ const cards = Array.from({ length: 10 });
 
 export function ShuffleAnimation() {
   return (
-    <div className="flex h-screen w-full flex-col items-center justify-center gap-8 overflow-hidden bg-background">
-        <h2 className="text-3xl font-bold font-headline text-primary animate-pulse">Shuffling Deck...</h2>
+    <div className="flex h-screen w-full flex-col items-center justify-center gap-8 overflow-hidden bg-background px-4">
+        <div className="game-surface flex flex-col items-center gap-4 px-8 py-10 text-center">
+          <h2 className="text-3xl font-bold font-headline text-primary animate-pulse">Shuffling Deck...</h2>
+          <p className="max-w-md text-sm text-muted-foreground md:text-base">
+            The deck is being prepared. Get ready for the next round.
+          </p>
+        </div>
         <div className="relative h-48 w-48">
         {cards.map((_, i) => (
             <motion.div
@@ -31,7 +36,7 @@ export function ShuffleAnimation() {
                 delay: i * 0.1,
             }}
             >
-            <GameCard card={{ id: `shuffle-${i}`, suit: 'Spades', rank: 'A' }} isFaceDown />
+            <GameCard card={{ id: `shuffle-${i}`, suit: 'Spades', rank: 'A' }} isFaceDown className="shadow-2xl" />
             </motion.div>
         ))}
         </div>
