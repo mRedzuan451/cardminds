@@ -436,22 +436,27 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
 
   const handleDiscardCardClick = (card: CardType) => {
+    const cardKey = `${card.rank}-${card.suit}`;
+    const matchingCards = activeHand.filter(handCard => `${handCard.rank}-${handCard.suit}` === cardKey);
     const newSelection = new Set(selectedToDiscard);
-    if (newSelection.has(card.id)) {
-        newSelection.delete(card.id);
+    const currentSelectedCardCount = activeHand.filter(handCard => newSelection.has(`${handCard.rank}-${handCard.suit}`)).length;
+
+    if (newSelection.has(cardKey)) {
+        newSelection.delete(cardKey);
     } else {
-        if (newSelection.size < 3) {
-            newSelection.add(card.id);
-        } else {
+        if (currentSelectedCardCount + matchingCards.length > 3) {
             toast({ title: "You can only select 3 cards to discard.", variant: "destructive" });
+            return;
         }
+        newSelection.add(cardKey);
     }
     setSelectedToDiscard(newSelection);
   };
   
   const handleConfirmDiscard = async () => {
-    if (!isDiscarding || !localPlayer || selectedToDiscard.size !== 3) return;
-    const cardsToDiscard = activeHand.filter(card => selectedToDiscard.has(card.id));
+    if (!isDiscarding || !localPlayer) return;
+    const cardsToDiscard = activeHand.filter(card => selectedToDiscard.has(`${card.rank}-${card.suit}`));
+    if (cardsToDiscard.length !== 3) return;
     try {
         await gameActions.discardCards({ gameId, playerId: localPlayer.id, cardsToDiscard });
     } catch (e: any) {
@@ -534,16 +539,33 @@ const renderDiscardUI = () => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="space-y-3">
-                    <p className="mb-2 font-bold">Selected: {selectedToDiscard.size} / 3</p>
+                    <p className="mb-2 font-bold">
+                        Selected: {activeHand.filter(card => selectedToDiscard.has(`${card.rank}-${card.suit}`)).length} / 3
+                    </p>
+                    {Array.from(selectedToDiscard).map((cardKey) => {
+                        const duplicateCount = activeHand.filter(card => `${card.rank}-${card.suit}` === cardKey).length;
+                        if (duplicateCount <= 1) return null;
+                        return (
+                            <p key={cardKey} className="text-sm text-muted-foreground text-center">
+                                Selecting this card will discard <span className="text-primary font-semibold">{duplicateCount}</span> matching cards.
+                            </p>
+                        );
+                    })}
                     <div className="flex flex-wrap gap-3 justify-center max-h-64 overflow-y-auto">
                         {activeHand.map((card) => (
-                            <GameCard
-                                key={card.id}
-                                card={card}
-                                mode={game?.gameMode}
-                                onClick={() => handleDiscardCardClick(card)}
-                                className={cn(selectedToDiscard.has(card.id) && "ring-4 ring-offset-2 ring-primary scale-105")}
-                            />
+                            <div key={card.id} className="relative">
+                                <GameCard
+                                    card={card}
+                                    mode={game?.gameMode}
+                                    onClick={() => handleDiscardCardClick(card)}
+                                    className={cn(selectedToDiscard.has(`${card.rank}-${card.suit}`) && "ring-4 ring-offset-2 ring-primary scale-105")}
+                                />
+                                {selectedToDiscard.has(`${card.rank}-${card.suit}`) && (
+                                    <div className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground shadow-lg">
+                                        {activeHand.filter(handCard => `${handCard.rank}-${handCard.suit}` === `${card.rank}-${card.suit}`).length}x
+                                    </div>
+                                )}
+                            </div>
                         ))}
                     </div>
                 </div>
