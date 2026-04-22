@@ -917,6 +917,11 @@ const renderDiscardUI = () => {
                 Continue to Next Round
               </Button>
             )}
+            {isGameOver && game.gameState === 'roundOver' && (
+              <Button onClick={handleNextRound} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id}>
+                View Winner
+              </Button>
+            )}
             {isGameOver && (
               <>
                 <Button onClick={handleBackToMenu} size="lg" className="shadow-lg" variant="outline">
