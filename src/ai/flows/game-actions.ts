@@ -414,6 +414,8 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
       const playerDocsSnap = await getDocs(playersQuery);
       const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
       const playerCount = players.length;
+
+      const nextRoundNumber = game.currentRound + 1;
       
       // Check for game over conditions first
       if (game.gameMode === 'special' && game.targetScore > 0) {
@@ -511,26 +513,29 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
           transaction.update(gameRef, {
               gameState: 'discarding',
               discardingPlayerId: playerToDiscard,
+              specialAction: null,
               deck: freshDeck,
               discardPile: cardsUsed,
               targetNumber: target,
               targetCards: cardsUsed,
               currentPlayerId: playerToDiscard, // The player discarding is the current player
-              currentRound: game.currentRound + 1,
+              currentRound: nextRoundNumber,
               roundWinnerIds: [],
           });
       } else {
           transaction.update(gameRef, {
             gameState: 'playerTurn',
+            specialAction: null,
+            discardingPlayerId: null,
             deck: freshDeck,
             discardPile: cardsUsed, // The cards used for the new target are the start of the pile
             targetNumber: target,
             targetCards: cardsUsed,
             currentPlayerId: game.players[0],
-            currentRound: game.currentRound + 1,
+            currentRound: nextRoundNumber,
             roundWinnerIds: [],
           });
-          console.log(`[nextRound] Round ${game.currentRound + 1} started.`);
+          console.log(`[nextRound] Round ${nextRoundNumber} started.`);
       }
     });
   });
