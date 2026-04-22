@@ -185,63 +185,68 @@ export const setAllowedSpecialCards = ai.defineFlow({ name: 'setAllowedSpecialCa
 });
 
 export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGameInputSchema }, async ({ gameId }) => {
-  await runTransaction(db, async (transaction) => {
-    console.log(`[startGame] Attempting to start game ${gameId}`);
-    // Read phase
-    const gameRef = doc(db, 'games', gameId);
-    const gameDoc = await transaction.get(gameRef);
-    if (!gameDoc.exists()) throw new Error("Game not found");
-    const game = gameDoc.data() as Game;
-    console.log(`[startGame] Game ${gameId} found. Mode: ${game.gameMode}`);
+  console.log(`[startGame] Attempting to start game ${gameId}`);
 
-    const playersQuery = query(collection(db, 'games', gameId, 'players'));
-    const playerDocsSnap = await getDocs(playersQuery);
-    const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
-    const playerCount = players.length;
-    console.log(`[startGame] Found ${playerCount} players.`);
+  const gameRef = doc(db, 'games', gameId);
+  const gameDoc = await getDoc(gameRef);
+  if (!gameDoc.exists()) throw new Error("Game not found");
+  const game = gameDoc.data() as Game;
+  console.log(`[startGame] Game ${gameId} found. Mode: ${game.gameMode}`);
 
-    // Write phase
-    let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount, game.allowedSpecialCards));
-    const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
-    freshDeck = updatedDeck;
-    console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
-    
-    const firstPlayerId = game.players[0];
-    
-    // Deal 5 cards to each player
-    const dealtHands: Record<string, Card[]> = {};
-    players.forEach(p => {
-        const hand = freshDeck.splice(0, 5);
-        dealtHands[p.id] = hand;
-        const playerRef = doc(db, 'games', gameId, 'players', p.id);
-        transaction.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
-    });
-    console.log(`[startGame] Dealt 5 cards to each player.`);
+  const playersQuery = query(collection(db, 'games', gameId, 'players'));
+  const playerDocsSnap = await getDocs(playersQuery);
+  const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+  const playerCount = players.length;
+  console.log(`[startGame] Found ${playerCount} players.`);
 
-    // Deal starting card to first player
-    if (freshDeck.length > 0) {
-        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-        const firstPlayerHand = dealtHands[firstPlayerId];
-        if (firstPlayerHand) {
-            const newHand = [...firstPlayerHand, freshDeck.shift()!];
-            transaction.update(firstPlayerRef, { hand: newHand });
-            console.log(`[startGame] Dealt starting card to first player ${firstPlayerId}.`);
-        }
-    }
-    
-    console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck.map(c => c.id));
+  if (playerCount === 0) {
+    throw new Error("Cannot start a game without players.");
+  }
 
-    transaction.update(gameRef, {
-        gameState: 'playerTurn',
-        deck: freshDeck,
-        discardPile: [], // Start with an empty discard pile
-        targetNumber: target,
-        targetCards: cardsUsed,
-        currentPlayerId: firstPlayerId,
-        currentRound: 1,
-    });
-    console.log(`[startGame] Game ${gameId} started. First turn: ${firstPlayerId}.`);
+  let freshDeck = shuffleDeck(createDeck(game.gameMode, playerCount, game.allowedSpecialCards));
+  const { target, cardsUsed, updatedDeck } = generateTarget(freshDeck, game.gameMode, playerCount);
+  freshDeck = updatedDeck;
+  console.log(`[startGame] Target generated: ${target}. Cards used:`, cardsUsed);
+
+  const firstPlayerId = game.players[0] ?? players[0].id;
+  const batch = writeBatch(db);
+  const dealtHands: Record<string, Card[]> = {};
+
+  players.forEach(p => {
+      const hand = freshDeck.splice(0, 5);
+      dealtHands[p.id] = hand;
+      const playerRef = doc(db, 'games', gameId, 'players', p.id);
+      batch.update(playerRef, { hand, roundScore: 0, passed: false, finalResult: 0, equation: [] });
   });
+  console.log(`[startGame] Dealt 5 cards to each player.`);
+
+  if (freshDeck.length > 0) {
+      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
+      const firstPlayerHand = dealtHands[firstPlayerId];
+      if (firstPlayerHand) {
+          const newHand = [...firstPlayerHand, freshDeck.shift()!];
+          batch.update(firstPlayerRef, { hand: newHand });
+          console.log(`[startGame] Dealt starting card to first player ${firstPlayerId}.`);
+      }
+  }
+
+  console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck.map(c => c.id));
+
+  batch.update(gameRef, {
+      gameState: 'playerTurn',
+      deck: freshDeck,
+      discardPile: [],
+      targetNumber: target,
+      targetCards: cardsUsed,
+      currentPlayerId: firstPlayerId,
+      currentRound: 1,
+      roundWinnerIds: [],
+      specialAction: null,
+      discardingPlayerId: null,
+  });
+
+  await batch.commit();
+  console.log(`[startGame] Game ${gameId} started. First turn: ${firstPlayerId}.`);
 });
 
 
