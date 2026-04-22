@@ -833,6 +833,11 @@ const renderDiscardUI = () => {
          <Card className="game-surface text-center p-8 border-2 border-primary/40 animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
           <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {renderRoundWinner()}
+          <p className="text-muted-foreground text-lg">
+            {isGameOver
+              ? 'The match has ended. Review the final results below.'
+              : 'The round is complete. The creator can continue to the next round.'}
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg mt-6">
             {players.map(player => (
                 <div key={player.id} className='space-y-3 game-panel p-4'>
@@ -853,7 +858,7 @@ const renderDiscardUI = () => {
             ))}
           </div>
           <Button onClick={handleNextRound} size="lg" className="mt-8 shadow-lg" disabled={game.creatorId !== localPlayer.id}>
-            { isGameOver ? 'Show Final Results' : 'Next Round' }
+            {isGameOver ? 'Show Final Results' : 'Continue to Next Round'}
           </Button>
         </Card>
       )}
