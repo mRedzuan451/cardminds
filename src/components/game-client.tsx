@@ -235,6 +235,12 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     return localPlayer?.hand ?? [];
   }, [localPlayer]);
 
+  const selectedDiscardCards = useMemo(() => {
+    return activeHand.filter(card => selectedToDiscard.has(`${card.rank}-${card.suit}`));
+  }, [activeHand, selectedToDiscard]);
+
+  const selectedDiscardCount = selectedDiscardCards.length;
+
   const handRow1 = useMemo(() => activeHand.slice(0, 7), [activeHand]);
   const handRow2 = useMemo(() => activeHand.slice(7), [activeHand]);
   
@@ -455,7 +461,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   
   const handleConfirmDiscard = async () => {
     if (!isDiscarding || !localPlayer) return;
-    const cardsToDiscard = activeHand.filter(card => selectedToDiscard.has(`${card.rank}-${card.suit}`));
+    const cardsToDiscard = selectedDiscardCards;
     if (cardsToDiscard.length !== 3) return;
     try {
         await gameActions.discardCards({ gameId, playerId: localPlayer.id, cardsToDiscard });
@@ -540,7 +546,7 @@ const renderDiscardUI = () => {
                 </AlertDialogHeader>
                 <div className="space-y-3">
                     <p className="mb-2 font-bold">
-                        Selected: {activeHand.filter(card => selectedToDiscard.has(`${card.rank}-${card.suit}`)).length} / 3
+                        Selected: {selectedDiscardCount} / 3
                     </p>
                     {Array.from(selectedToDiscard).map((cardKey) => {
                         const duplicateCount = activeHand.filter(card => `${card.rank}-${card.suit}` === cardKey).length;
@@ -571,7 +577,7 @@ const renderDiscardUI = () => {
                 </div>
                 <AlertDialogFooter>
                     <Button
-                        disabled={selectedToDiscard.size !== 3}
+                        disabled={selectedDiscardCount !== 3}
                         onClick={handleConfirmDiscard}
                         className="shadow-lg"
                     >
