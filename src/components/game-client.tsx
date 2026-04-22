@@ -884,6 +884,14 @@ const renderDiscardUI = () => {
               ? 'The match has ended. Review the final results below.'
               : 'The round is complete. The creator can continue to the next round.'}
           </p>
+          {game.gameState === 'gameOver' && (
+            <div className="mt-6 flex justify-center">
+              <Button onClick={handleRematch} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id || isRematching}>
+                <RefreshCw className={cn("mr-2 h-5 w-5", isRematching && "animate-spin")} />
+                Play Again
+              </Button>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg mt-6">
             {players.map(player => (
                 <div key={player.id} className='space-y-3 game-panel p-4'>
@@ -911,10 +919,6 @@ const renderDiscardUI = () => {
             )}
             {isGameOver && (
               <>
-                <Button onClick={handleRematch} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id || isRematching}>
-                  <RefreshCw className={cn("mr-2 h-5 w-5", isRematching && "animate-spin")} />
-                  Play Again
-                </Button>
                 <Button onClick={handleBackToMenu} size="lg" className="shadow-lg" variant="outline">
                   <ArrowLeft className="mr-2 h-5 w-5" /> Menu
                 </Button>
