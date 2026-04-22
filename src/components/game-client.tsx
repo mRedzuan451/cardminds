@@ -586,6 +586,36 @@ const renderDiscardUI = () => {
     }
     return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winners[0].name} Wins This Round!</p>;
   };
+
+  const renderTotalWinnerBanner = () => {
+    if (!game || game.gameState !== 'gameOver' || !players) return null;
+    if (totalWinner.length === 0) return null;
+
+    if (totalWinner.length > 1) {
+      return (
+        <div className="game-panel border border-white/10 bg-gradient-to-r from-purple-500/15 via-fuchsia-500/10 to-indigo-500/15 px-6 py-5 shadow-xl">
+          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Total Winner</p>
+          <p className="mt-2 text-3xl md:text-4xl font-headline text-primary">It&apos;s a tie for the championship!</p>
+          <p className="mt-2 text-lg text-muted-foreground">{totalWinner.map(player => player.name).join(' • ')}</p>
+        </div>
+      );
+    }
+
+    const winner = totalWinner[0];
+
+    return (
+      <div className="relative overflow-hidden rounded-[28px] border border-primary/30 bg-gradient-to-r from-primary/20 via-fuchsia-500/15 to-amber-500/20 px-6 py-6 shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_45%)]" />
+        <div className="relative flex flex-col items-center gap-2 text-center">
+          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Total Winner</p>
+          <p className="text-4xl md:text-5xl font-headline text-primary drop-shadow-sm">{winner.name}</p>
+          <p className="text-lg text-muted-foreground">
+            Champion of the match with <span className="text-primary font-bold">{winner.totalScore}</span> total points
+          </p>
+        </div>
+      </div>
+    );
+  };
   
   const isGameOver = useMemo(() => {
       if (!game || !players) return false;
@@ -832,6 +862,11 @@ const renderDiscardUI = () => {
       {(game.gameState === 'roundOver' || game.gameState === 'gameOver') && (
          <Card className="game-surface text-center p-8 border-2 border-primary/40 animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
           <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
+          {game.gameState === 'gameOver' && (
+            <div className="mb-6">
+              {renderTotalWinnerBanner()}
+            </div>
+          )}
           {renderRoundWinner()}
           <p className="text-muted-foreground text-lg">
             {isGameOver
