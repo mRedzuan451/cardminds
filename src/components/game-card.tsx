@@ -18,8 +18,8 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
 
   if (isFaceDown) {
     return (
-      <div className={cn("aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-primary p-2 shadow-lg", className)} {...props}>
-        <div className="h-full w-full rounded-md border-2 border-primary-foreground/50 bg-primary-foreground/20" />
+      <div className={cn("aspect-[2.5/3.5] w-24 md:w-28 rounded-2xl bg-primary p-2 shadow-xl ring-1 ring-inset ring-white/10 transition-transform duration-200 hover:-translate-y-1 hover:shadow-2xl", className)} {...props}>
+        <div className="h-full w-full rounded-xl border-2 border-primary-foreground/40 bg-[radial-gradient(circle_at_top,hsl(var(--primary-foreground)/0.18),transparent_45%),linear-gradient(135deg,hsl(var(--primary-foreground)/0.14),transparent)]" />
       </div>
     );
   }
@@ -29,7 +29,7 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
     return (
       <div
         className={cn(
-          "aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-amber-400/50 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer text-amber-500",
+          "aspect-[2.5/3.5] w-24 md:w-28 rounded-2xl bg-card p-2 shadow-xl ring-1 ring-inset ring-amber-400/40 flex flex-col justify-between cursor-pointer text-amber-500 transition-all duration-200 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-2xl",
           className
         )}
         {...props}
@@ -53,7 +53,7 @@ export function GameCard({ card, isFaceDown = false, className, mode = 'easy', .
   return (
     <div
       className={cn(
-        "aspect-[2.5/3.5] w-24 md:w-28 rounded-lg bg-card p-2 shadow-lg ring-1 ring-inset ring-black/10 flex flex-col justify-between hover:scale-105 hover:shadow-2xl hover:-translate-y-2 cursor-pointer",
+        "aspect-[2.5/3.5] w-24 md:w-28 rounded-2xl bg-card p-2 shadow-xl ring-1 ring-inset ring-black/10 flex flex-col justify-between cursor-pointer transition-all duration-200 hover:-translate-y-2 hover:scale-[1.03] hover:shadow-2xl",
         color,
         className
       )}

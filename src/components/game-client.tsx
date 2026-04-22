@@ -703,20 +703,20 @@ const renderDiscardUI = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-        <Card className="text-center p-4 shadow-lg w-full md:col-span-1">
-          <CardHeader className="p-0 mb-2">
+        <Card className="game-surface text-center p-5 w-full md:col-span-1">
+          <CardHeader className="p-0 mb-3">
             <CardTitle className="text-lg text-muted-foreground font-headline">
-              {game.gameMode === 'special' ? `Score to Win: ${game.targetScore}` : `Scoreboard (Round ${game.currentRound}/${game.totalRounds})`}
+              {game.gameMode === 'special' ? `Score to Win: ${game.targetScore}` : `Scoreboard · Round ${game.currentRound}/${game.totalRounds}`}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 grid gap-2">
               {players.map(p => (
                 <div key={p.id} className={cn(
-                  "flex items-center gap-2 text-lg font-bold p-2 rounded-md transition-all",
-                  p.id === currentPlayer?.id && "bg-primary/20 scale-105"
+                  "flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base font-bold transition-all",
+                  p.id === currentPlayer?.id && "bg-primary/20 ring-1 ring-primary/40 scale-[1.02]"
                 )}>
-                    <User /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}: 
-                    <span className="text-primary">
+                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}</span>
+                    <span className="text-primary text-lg">
                         {game.gameMode === 'special' ? `${p.totalScore} / ${game.targetScore}` : p.totalScore}
                     </span>
                 </div>
@@ -725,13 +725,13 @@ const renderDiscardUI = () => {
         </Card>
         
         <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
-            <Card className="text-center p-4 shadow-lg w-full">
+            <Card className="game-surface text-center p-5 w-full">
               <CardHeader className="p-0 mb-1">
                   <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
               </CardHeader>
-              <CardContent className="p-0 flex items-center justify-center gap-2">
-                  <p className="text-6xl font-bold text-primary">{game.targetNumber}</p>
-                  <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground">
+              <CardContent className="p-0 flex items-center justify-center gap-3">
+                  <p className="text-6xl font-bold text-primary drop-shadow-sm">{game.targetNumber}</p>
+                  <Button variant="ghost" size="icon" onClick={() => setShowHint(true)} className="text-muted-foreground hover:bg-white/10">
                   <Lightbulb className="h-6 w-6" />
                   <span className="sr-only">Show hint</span>
                   </Button>
@@ -752,7 +752,7 @@ const renderDiscardUI = () => {
       </div>
 
       <AlertDialog open={showHint} onOpenChange={setShowHint}>
-        <AlertDialogContent>
+        <AlertDialogContent className="game-surface max-w-3xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline text-2xl">Target Combination</AlertDialogTitle>
             <AlertDialogDescription>
@@ -781,7 +781,7 @@ const renderDiscardUI = () => {
       </AlertDialog>
 
       {isMyTurn && (
-        <Card className="shadow-lg sticky top-4 z-10 bg-card/90 backdrop-blur-sm p-3 md:col-start-2">
+        <Card className="game-surface sticky top-4 z-10 p-5 md:col-start-2">
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               <User />
@@ -789,22 +789,22 @@ const renderDiscardUI = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 pt-3">
-            <div className="flex items-center gap-2 bg-muted p-2 rounded-lg min-h-[48px] text-xl font-bold flex-wrap">
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-background/50 p-3 min-h-[60px] text-xl font-bold flex-wrap shadow-inner">
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
-            <div className="flex items-center justify-between gap-2 mt-3">
+            <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
               <div className={cn("grid grid-cols-2 gap-2", (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden")}>
                 <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
                 <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Button onClick={handleSubmitEquation} className="flex-grow" size="lg" disabled={equation.length === 0}>
+              <div className="grid grid-cols-3 gap-2 w-full md:w-auto">
+                <Button onClick={handleSubmitEquation} className="flex-grow shadow-lg" size="lg" disabled={equation.length === 0}>
                   <Send className="mr-2 h-4 w-4"/> Submit
                 </Button>
-                <Button onClick={handlePass} className="flex-grow" variant="secondary" size="lg">
+                <Button onClick={handlePass} className="flex-grow shadow-lg" variant="secondary" size="lg">
                   <LogOut className="mr-2 h-4 w-4"/> Pass
                 </Button>
-                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow" disabled={equation.length === 0} size="lg">
+                <Button onClick={handleClearEquation} variant="destructive" className="flex-grow shadow-lg" disabled={equation.length === 0} size="lg">
                   <X className="mr-2 h-4 w-4"/> Clear
                 </Button>
               </div>
@@ -814,7 +814,7 @@ const renderDiscardUI = () => {
       )}
 
       {!isMyTurn && game.gameState === 'playerTurn' && (
-        <Card className="text-center p-4 shadow-lg md:col-start-2">
+        <Card className="game-surface text-center p-4 md:col-start-2">
           <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl">
             <Users />
             Waiting for {currentPlayer?.name} to play...
@@ -823,39 +823,15 @@ const renderDiscardUI = () => {
       )}
 
       {game.gameState === 'gameOver' && (
-         <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
-           <CardTitle className="text-5xl font-headline mb-4 flex items-center justify-center gap-4"><Trophy className="w-12 h-12 text-yellow-400" />Game Over!</CardTitle>
-           {totalWinner.length > 1 && <p className="text-4xl font-bold my-6 text-muted-foreground">It&apos;s a tie between {totalWinner.map(p => p.name).join(' and ')}!</p>}
-           {totalWinner.length === 1 && <p className="text-4xl font-bold my-6 text-primary">{totalWinner[0].name} is the Grand Winner!</p>}
-           
-           <div className="text-2xl font-bold">Final Scores</div>
-           <div className="flex justify-center items-center gap-8 text-xl my-4 flex-wrap">
-              {players.map(p => (
-                <div key={p.id} className="flex items-center gap-2"><User /> {p.name}: <span className="text-primary">{p.totalScore}</span></div>
-              ))}
-           </div>
-           
-           {localPlayer.id === game.creatorId ? (
-              <Button onClick={handleRematch} size="lg" className="mt-8" disabled={isRematching}>
-                {isRematching ? 'Creating New Game...' : 'Play Again'}
-              </Button>
-           ) : (
-             <p className="text-xl mt-8 text-muted-foreground">Waiting for {players.find(p=>p.id === game.creatorId)?.name} to start a new game.</p>
-           )}
-
-         </Card>
-       )}
-
-      {game.gameState === 'roundOver' && (
-        <Card className="text-center p-8 bg-card/90 backdrop-blur-sm border-2 border-primary shadow-2xl animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
+         <Card className="game-surface text-center p-8 border-2 border-primary/40 animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
           <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {renderRoundWinner()}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg mt-6">
             {players.map(player => (
-                <div key={player.id} className='space-y-2'>
-                  <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
-                  <div className="flex items-center justify-center gap-2 flex-wrap min-h-[52px]">
-                    Equation:
+                <div key={player.id} className='space-y-3 game-panel p-4'>
+                  <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User className="h-5 w-5" /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
+                  <div className="game-panel flex items-center justify-center gap-2 flex-wrap min-h-[52px] px-4 py-3">
+                    <span className="text-sm uppercase tracking-wide text-muted-foreground">Equation</span>
                     {player.equation.length > 0 ? (
                       <>
                       {player.equation.map((term, i) => (
@@ -869,7 +845,7 @@ const renderDiscardUI = () => {
                 </div>
             ))}
           </div>
-          <Button onClick={handleNextRound} size="lg" className="mt-8" disabled={game.creatorId !== localPlayer.id}>
+          <Button onClick={handleNextRound} size="lg" className="mt-8 shadow-lg" disabled={game.creatorId !== localPlayer.id}>
             { isGameOver ? 'Show Final Results' : 'Next Round' }
           </Button>
         </Card>
@@ -881,7 +857,7 @@ const renderDiscardUI = () => {
             <User />
             Your Hand
           </h2>
-          <div className="flex flex-col items-center gap-4">
+          <div className="game-surface flex flex-col items-center gap-4 px-4 py-6 md:px-6">
             <div className="flex justify-center -space-x-12">
               {handRow1.map((card, index) => (
                 <div
