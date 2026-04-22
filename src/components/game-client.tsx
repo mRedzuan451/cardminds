@@ -903,9 +903,24 @@ const renderDiscardUI = () => {
                 </div>
             ))}
           </div>
-          <Button onClick={handleNextRound} size="lg" className="mt-8 shadow-lg" disabled={game.creatorId !== localPlayer.id}>
-            {isGameOver ? 'Show Final Results' : 'Continue to Next Round'}
-          </Button>
+          <div className="mt-8 flex flex-col md:flex-row gap-3 justify-center">
+            {!isGameOver && (
+              <Button onClick={handleNextRound} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id}>
+                Continue to Next Round
+              </Button>
+            )}
+            {isGameOver && (
+              <>
+                <Button onClick={handleRematch} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id || isRematching}>
+                  <RefreshCw className={cn("mr-2 h-5 w-5", isRematching && "animate-spin")} />
+                  Play Again
+                </Button>
+                <Button onClick={handleBackToMenu} size="lg" className="shadow-lg" variant="outline">
+                  <ArrowLeft className="mr-2 h-5 w-5" /> Menu
+                </Button>
+              </>
+            )}
+          </div>
         </Card>
       )}
 
