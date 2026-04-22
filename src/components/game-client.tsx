@@ -969,53 +969,57 @@ const renderDiscardUI = () => {
           </h2>
           <div className="game-surface flex flex-col items-center gap-4 px-4 py-6 md:px-6">
             <div className="game-card-stack md:-space-x-12">
-              {handRow1.map((card, index) => (
+              {handRow1.map((card, index) => {
+                const handIndex = index;
+                return (
                 <div
                   key={card.id}
                   className={cn(
                     "transition-all duration-300 ease-out hover:-translate-y-4"
                   )}
-                  style={{ zIndex: index }}
+                  style={{ zIndex: handIndex }}
                 >
                   <GameCard
                     card={card}
                     mode={game.gameMode}
-                    onClick={() => handleCardClick(card, activeHand.findIndex(c => c.id === card.id))}
+                    onClick={() => handleCardClick(card, handIndex)}
                     className={cn(
                       'transition-all duration-200',
                       {
-                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(activeHand.findIndex(c => c.id === card.id)),
+                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
                         "cursor-not-allowed": !isMyTurn
                       }
                     )}
                   />
                 </div>
-              ))}
+              );})}
             </div>
             {handRow2.length > 0 && (
               <div className="game-card-stack md:-space-x-12">
-                {handRow2.map((card, index) => (
+                {handRow2.map((card, index) => {
+                  const handIndex = index + 7;
+                  return (
                   <div
                     key={card.id}
                     className={cn(
                       "transition-all duration-300 ease-out hover:-translate-y-4"
                     )}
-                    style={{ zIndex: index + 7 }}
+                    style={{ zIndex: handIndex }}
                   >
                     <GameCard
                       card={card}
                       mode={game.gameMode}
-                      onClick={() => handleCardClick(card, activeHand.findIndex(c => c.id === card.id))}
+                      onClick={() => handleCardClick(card, handIndex)}
                       className={cn(
                         'transition-all duration-200',
                         {
-                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(activeHand.findIndex(c => c.id === card.id)),
+                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
                           "cursor-not-allowed": !isMyTurn
                         }
                       )}
                     />
                   </div>
-                ))}
+                );})}
               </div>
             )}
           </div>
