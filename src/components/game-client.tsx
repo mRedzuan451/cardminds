@@ -829,7 +829,7 @@ const renderDiscardUI = () => {
         </Card>
       )}
 
-      {game.gameState === 'gameOver' && (
+      {(game.gameState === 'roundOver' || game.gameState === 'gameOver') && (
          <Card className="game-surface text-center p-8 border-2 border-primary/40 animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
           <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {renderRoundWinner()}
