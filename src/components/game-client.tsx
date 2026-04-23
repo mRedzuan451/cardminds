@@ -1011,7 +1011,7 @@ const renderDiscardUI = () => {
         </Card>
       )}
 
-      <div className="pt-8">
+      <div className={cn("pt-8", allPlayersSubmitted && game.gameMode !== 'special' && "hidden")}>
         <div className="text-center">
           <h2 className="text-2xl font-bold font-headline mb-4 flex items-center justify-center gap-2">
             <User />
