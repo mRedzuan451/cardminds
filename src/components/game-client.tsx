@@ -974,10 +974,10 @@ const renderDiscardUI = () => {
           <div className="mt-6 flex justify-center">
             <div className="rounded-3xl border border-white/10 bg-white/5 px-8 py-8 shadow-xl text-center min-w-[280px]">
               <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground mb-3">Winner</p>
-              <h3 className="text-4xl md:text-5xl font-headline font-bold flex items-center justify-center gap-3 text-primary">
+              <div className="flex items-center justify-center gap-3 text-primary">
                 <Trophy className="h-7 w-7 text-amber-300" />
-                {totalWinner.length > 0 ? totalWinner[0].name : 'No Winner'}
-              </h3>
+                <span className="text-4xl md:text-5xl font-headline font-bold">Winner</span>
+              </div>
             </div>
           </div>
           <div className="mt-8 flex flex-col md:flex-row gap-3 justify-center">
