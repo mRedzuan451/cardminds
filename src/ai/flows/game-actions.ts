@@ -350,7 +350,8 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     const game = gameDoc.data() as Game;
     const player = playerDoc.data() as Player;
 
-    if (game.currentPlayerId !== playerId) {
+    const isSpecialModeTurnBased = game.gameMode === 'special';
+    if (isSpecialModeTurnBased && game.currentPlayerId !== playerId) {
       console.warn(`[playerAction] Ignoring action from player ${playerId} because it's not their turn.`);
       return;
     }
@@ -384,6 +385,7 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         cardsUsed: cardsUsed,
         hand: newHand,
         passed: true, // Submitting also means you are done for the turn cycle
+        submitted: true,
       });
       // Move used cards to discard pile
       transaction.update(gameRef, { discardPile: arrayUnion(...cardsUsed) });
@@ -392,6 +394,7 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
         console.log(`[playerAction] Player ${playerId} passed.`);
         transaction.update(playerRef, {
           passed: true, 
+          submitted: false,
           equation: [], 
           cardsUsed: [],
           finalResult: 0, 
@@ -400,8 +403,23 @@ export const playerAction = ai.defineFlow({ name: 'playerAction', inputSchema: P
     }
   });
 
-  // Now that the player's action is committed, advance the turn.
-  await advanceTurn(gameId);
+  // Now that the player's action is committed, advance the turn only for turn-based special mode.
+  const gameRef = doc(db, 'games', gameId);
+  const gameDoc = await getDoc(gameRef);
+  if (gameDoc.exists()) {
+    const game = gameDoc.data() as Game;
+    if (game.gameMode === 'special') {
+      await advanceTurn(gameId);
+    } else {
+      const playersQuery = query(collection(db, 'games', gameId, 'players'));
+      const playerDocsSnap = await getDocs(playersQuery);
+      const players = playerDocsSnap.docs.map(d => ({ ...d.data(), id: d.id } as Player));
+      const allPlayersHaveActed = players.every(p => p.passed);
+      if (allPlayersHaveActed) {
+        await advanceTurn(gameId);
+      }
+    }
+  }
 });
 
 export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdInputSchema }, async ({ gameId }) => {
@@ -476,6 +494,7 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
         transaction.update(playerRef, {
             roundScore: 0,
             passed: false,
+            submitted: false,
             finalResult: 0,
             equation: [],
             cardsUsed: [],

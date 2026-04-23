@@ -21,6 +21,7 @@ export interface Player {
     roundScore: number;
     totalScore: number;
     passed: boolean;
+    submitted?: boolean;
     finalResult: number;
     equation: EquationTerm[];
     cardsUsed?: Card[];

@@ -212,9 +212,16 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     return currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
   }, [currentPlayer, localPlayer, game]);
 
+  const canSubmitAnytime = game?.gameMode === 'easy' || game?.gameMode === 'pro';
+
   const isDiscarding = useMemo(() => {
     return game?.gameState === 'discarding' && game.discardingPlayerId === localPlayer?.id;
   }, [game, localPlayer]);
+
+  const allPlayersSubmitted = useMemo(() => {
+    if (!game || !players || (game.gameMode !== 'easy' && game.gameMode !== 'pro')) return false;
+    return players.every(player => player.passed);
+  }, [game, players]);
 
   // Reset equation when turn changes
   useEffect(() => {
@@ -277,7 +284,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
 
   const handlePass = async () => {
-    if (!isMyTurn || !localPlayer) return;
+    if ((!isMyTurn && !canSubmitAnytime) || !localPlayer) return;
     try {
       await gameActions.playerAction({ gameId, playerId: localPlayer.id, action: 'pass' });
       handleClearEquation();
@@ -287,7 +294,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
   
   const handleSubmitEquation = async () => {
-    if (!isMyTurn || !localPlayer || !game) return;
+    if ((!isMyTurn && !canSubmitAnytime) || !localPlayer || !game) return;
 
     if (game.gameMode === 'easy') {
         if (equation.length === 1) {
@@ -705,7 +712,7 @@ const renderDiscardUI = () => {
              <div className="space-y-4">
               <h3 className="text-2xl font-bold">Players ({players.length}/{game.maxPlayers})</h3>
               <div className="grid gap-2">
-                {players.map(p => <div key={p.id} className="game-panel flex items-center justify-between px-4 py-3 text-lg">{p.name} <span className="text-sm text-muted-foreground">{p.id === game.creatorId && 'Creator'} {p.id === localPlayer.id && 'You'}</span></div>)}
+                {players.map(p => <div key={p.id} className="game-panel flex items-center justify-between px-4 py-3 text-lg">{p.name} <span className="flex items-center gap-2 text-sm text-muted-foreground">{p.id === game.creatorId && 'Creator'} {p.id === localPlayer.id && 'You'} {game.gameMode !== 'special' && <Badge variant={p.submitted ? 'default' : 'secondary'} className={cn('text-xs uppercase tracking-wide', p.submitted ? 'bg-emerald-500 text-white' : 'bg-white/10 text-muted-foreground')}>{p.submitted ? 'Submitted' : 'Waiting'}</Badge>}</span></div>)}
               </div>
             </div>
             {localPlayer.id === game.creatorId && (
@@ -895,6 +902,16 @@ const renderDiscardUI = () => {
             <Users />
             Waiting for {currentPlayer?.name} to play...
           </CardTitle>
+        </Card>
+      )}
+
+      {allPlayersSubmitted && game.gameMode !== 'special' && game.gameState === 'playerTurn' && (
+        <Card className="game-surface border border-emerald-500/30 bg-emerald-500/10 text-center p-4 md:col-span-3 max-w-3xl mx-auto">
+          <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl text-emerald-200">
+            <Trophy className="h-5 w-5" />
+            All players have submitted
+          </CardTitle>
+          <p className="mt-2 text-sm text-muted-foreground">The round will conclude automatically.</p>
         </Card>
       )}
 
