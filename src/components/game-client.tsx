@@ -290,6 +290,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     try {
       await gameActions.playerAction({ gameId, playerId: localPlayer.id, action: 'pass' });
       handleClearEquation();
+      toast({ title: "Passed", description: "Your turn cycle is marked as passed.", variant: "default" });
     } catch(e: any) {
        toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -810,7 +811,23 @@ const renderDiscardUI = () => {
                   "flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base font-bold transition-all",
                   p.id === currentPlayer?.id && "bg-primary/20 ring-1 ring-primary/40 scale-[1.02]"
                 )}>
-                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}</span>
+                    <span className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      {p.name.split(' ')[0]}{p.id === localPlayer.id && ' (You)'}
+                      {game.gameMode !== 'special' && (
+                        <Badge
+                          variant={p.passed ? (p.submitted ? 'default' : 'secondary') : 'outline'}
+                          className={cn(
+                            'ml-2 border-0 text-xs uppercase tracking-wide text-white',
+                            p.passed
+                              ? (p.submitted ? 'bg-emerald-500/80' : 'bg-amber-500/80')
+                              : 'bg-white/10 text-muted-foreground'
+                          )}
+                        >
+                          {p.passed ? (p.submitted ? 'Submitted' : 'Passed') : 'Waiting'}
+                        </Badge>
+                      )}
+                    </span>
                     <span className="text-primary text-lg">
                         {game.gameMode === 'special' ? `${p.totalScore} / ${game.targetScore}` : p.totalScore}
                     </span>
