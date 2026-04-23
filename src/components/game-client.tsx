@@ -971,15 +971,6 @@ const renderDiscardUI = () => {
               </Button>
             </div>
           )}
-          <div className="mt-6 flex justify-center">
-            <div className="rounded-3xl border border-white/10 bg-white/5 px-8 py-8 shadow-xl text-center min-w-[280px]">
-              <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground mb-3">Winner</p>
-              <div className="flex items-center justify-center gap-3 text-primary">
-                <Trophy className="h-7 w-7 text-amber-300" />
-                <span className="text-4xl md:text-5xl font-headline font-bold">Winner</span>
-              </div>
-            </div>
-          </div>
           <div className="mt-8 flex flex-col md:flex-row gap-3 justify-center">
             {!isGameOver && (
               <Button onClick={handleNextRound} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id}>
