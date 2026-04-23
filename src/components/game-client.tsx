@@ -951,18 +951,11 @@ const renderDiscardUI = () => {
 
       {(game.gameState === 'roundOver' || game.gameState === 'gameOver') && (
          <Card className="game-surface text-center p-8 border-2 border-primary/40 animate-in fade-in-50 zoom-in-95 md:col-span-3 max-w-4xl mx-auto">
-          <CardTitle className="text-4xl font-headline mb-4">Round {game.currentRound} Over!</CardTitle>
           {game.gameState === 'gameOver' && (
             <div className="mb-6">
               {renderTotalWinnerBanner()}
             </div>
           )}
-          {renderRoundWinner()}
-          <p className="text-muted-foreground text-lg">
-            {isGameOver
-              ? 'The match has ended. Review the final results below.'
-              : 'The round is complete. The creator can continue to the next round.'}
-          </p>
           {game.gameState === 'gameOver' && (
             <div className="mt-6 flex justify-center">
               <Button onClick={handleRematch} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id || isRematching}>
