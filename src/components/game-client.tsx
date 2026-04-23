@@ -975,18 +975,20 @@ const renderDiscardUI = () => {
             {players.map(player => (
                 <div key={player.id} className='space-y-3 game-panel p-4'>
                   <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User className="h-5 w-5" /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
-                  <div className="game-panel flex items-center justify-center gap-2 flex-wrap min-h-[52px] px-4 py-3">
-                    <span className="text-sm uppercase tracking-wide text-muted-foreground">Equation</span>
-                    {player.equation.length > 0 ? (
-                      <>
-                      {player.equation.map((term, i) => (
-                        <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}</Badge>
-                      ))}
-                      <span className="mx-2">=</span>
-                      <span className="font-bold text-accent">{player.finalResult}</span>
-                      </>
-                    ) : <p>Passed.</p>}
-                  </div>
+                  {game.gameState !== 'gameOver' && (
+                    <div className="game-panel flex items-center justify-center gap-2 flex-wrap min-h-[52px] px-4 py-3">
+                      <span className="text-sm uppercase tracking-wide text-muted-foreground">Equation</span>
+                      {player.equation.length > 0 ? (
+                        <>
+                        {player.equation.map((term, i) => (
+                          <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}</Badge>
+                        ))}
+                        <span className="mx-2">=</span>
+                        <span className="font-bold text-accent">{player.finalResult}</span>
+                        </>
+                      ) : <p>Passed.</p>}
+                    </div>
+                  )}
                 </div>
             ))}
           </div>
