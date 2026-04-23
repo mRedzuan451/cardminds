@@ -973,22 +973,14 @@ const renderDiscardUI = () => {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-lg mt-6">
             {players.map(player => (
-                <div key={player.id} className='space-y-3 game-panel p-4'>
-                  <h3 className="text-2xl font-bold flex items-center justify-center gap-2"><User className="h-5 w-5" /> {player.name} Score: <span className="text-primary">{player.roundScore}</span></h3>
-                  {game.gameState !== 'gameOver' && (
-                    <div className="game-panel flex items-center justify-center gap-2 flex-wrap min-h-[52px] px-4 py-3">
-                      <span className="text-sm uppercase tracking-wide text-muted-foreground">Equation</span>
-                      {player.equation.length > 0 ? (
-                        <>
-                        {player.equation.map((term, i) => (
-                          <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-xl p-2">{term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}</Badge>
-                        ))}
-                        <span className="mx-2">=</span>
-                        <span className="font-bold text-accent">{player.finalResult}</span>
-                        </>
-                      ) : <p>Passed.</p>}
-                    </div>
-                  )}
+                <div key={player.id} className='space-y-3 game-panel p-4 text-center'>
+                  <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-6 shadow-xl">
+                    <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground mb-3">Winner</p>
+                    <h3 className="text-4xl md:text-5xl font-headline font-bold flex items-center justify-center gap-3 text-primary">
+                      <Trophy className="h-7 w-7 text-amber-300" />
+                      {player.name}
+                    </h3>
+                  </div>
                 </div>
             ))}
           </div>
