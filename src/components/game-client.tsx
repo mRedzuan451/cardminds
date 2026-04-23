@@ -632,7 +632,8 @@ const renderDiscardUI = () => {
     if (winners.length === 0) {
       return <p className="text-4xl md:text-5xl font-bold my-6 text-muted-foreground">No winner this round!</p>;
     }
-    return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winners[0].name} Wins This Round!</p>;
+    const winnerMessage = winners[0].id === localPlayer?.id ? 'You win this round!' : `${winners[0].name} wins this round!`;
+    return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winnerMessage}</p>;
   };
 
   const renderTotalWinnerBanner = () => {
@@ -798,7 +799,7 @@ const renderDiscardUI = () => {
         </Button>
       </div>
 
-      <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-6 items-start", allPlayersSubmitted && game.gameMode !== 'special' && "hidden") }>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         <Card className="game-surface text-center p-5 w-full md:col-span-1">
           <CardHeader className="p-0 mb-3">
             <CardTitle className="text-lg text-muted-foreground font-headline">
