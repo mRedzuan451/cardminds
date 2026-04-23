@@ -798,7 +798,7 @@ const renderDiscardUI = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+      <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-6 items-start", allPlayersSubmitted && game.gameMode !== 'special' && "hidden") }>
         <Card className="game-surface text-center p-5 w-full md:col-span-1">
           <CardHeader className="p-0 mb-3">
             <CardTitle className="text-lg text-muted-foreground font-headline">
@@ -836,7 +836,7 @@ const renderDiscardUI = () => {
           </CardContent>
         </Card>
         
-        <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
+        <div className={cn("w-full md:col-span-1 flex flex-col items-center justify-center gap-4", allPlayersSubmitted && game.gameMode !== 'special' && "hidden")}>
             <Card className="game-surface text-center p-5 w-full">
               <CardHeader className="p-0 mb-1">
                   <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
@@ -892,7 +892,7 @@ const renderDiscardUI = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {canInteractWithHand && (
+      {canInteractWithHand && !allPlayersSubmitted && (
         <Card className="game-surface sticky top-4 z-10 p-5 md:col-start-2">
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
