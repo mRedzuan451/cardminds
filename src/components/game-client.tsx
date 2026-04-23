@@ -350,7 +350,17 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     await updateDoc(gameRef, { gameState: 'shuffling' });
     
     setTimeout(async () => {
-        await gameActions.startGame({ gameId });
+        try {
+          await gameActions.startGame({ gameId });
+        } catch (e: any) {
+          console.error('[handleStartGame] Failed to start game:', e);
+          toast({
+            title: 'Failed to start game',
+            description: e?.message ?? 'An unexpected error occurred while starting the game.',
+            variant: 'destructive',
+          });
+          await updateDoc(gameRef, { gameState: 'lobby' });
+        }
     }, 3000);
   };
   
