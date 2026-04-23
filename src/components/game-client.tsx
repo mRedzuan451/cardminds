@@ -207,12 +207,14 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     if (!game || !players || players.length === 0) return null;
     return players.find(p => p.id === game.currentPlayerId);
   }, [game, players]);
-  
-  const isMyTurn = useMemo(() => {
-    return currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
+
+  const isSpecialModeMyTurn = useMemo(() => {
+    return game?.gameMode === 'special' && currentPlayer?.id === localPlayer?.id && game?.gameState === 'playerTurn';
   }, [currentPlayer, localPlayer, game]);
 
   const canSubmitAnytime = game?.gameMode === 'easy' || game?.gameMode === 'pro';
+
+  const canInteractWithHand = canSubmitAnytime || isSpecialModeMyTurn;
 
   const isDiscarding = useMemo(() => {
     return game?.gameState === 'discarding' && game.discardingPlayerId === localPlayer?.id;
@@ -225,10 +227,10 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
   // Reset equation when turn changes
   useEffect(() => {
-    if (!isMyTurn) {
+    if (!canSubmitAnytime && !isSpecialModeMyTurn) {
         handleClearEquation();
     }
-  }, [isMyTurn]);
+  }, [canSubmitAnytime, isSpecialModeMyTurn]);
 
   // Reset discard selection when discard state changes
   useEffect(() => {
@@ -256,7 +258,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
 
   const handleCardClick = (card: CardType, index: number) => {
-    if (!isMyTurn) return;
+    if (!canInteractWithHand) return;
     if (usedCardIndices.has(index)) return;
 
     if (card.suit === 'Special' && localPlayer) {
@@ -284,7 +286,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
 
   const handlePass = async () => {
-    if ((!isMyTurn && !canSubmitAnytime) || !localPlayer) return;
+    if (!localPlayer || !canInteractWithHand) return;
     try {
       await gameActions.playerAction({ gameId, playerId: localPlayer.id, action: 'pass' });
       handleClearEquation();
@@ -294,7 +296,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   };
   
   const handleSubmitEquation = async () => {
-    if ((!isMyTurn && !canSubmitAnytime) || !localPlayer || !game) return;
+    if (!localPlayer || !game || !canInteractWithHand) return;
 
     if (game.gameMode === 'easy') {
         if (equation.length === 1) {
@@ -873,12 +875,12 @@ const renderDiscardUI = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {isMyTurn && (
+      {canInteractWithHand && (
         <Card className="game-surface sticky top-4 z-10 p-5 md:col-start-2">
           <CardHeader className="p-0">
             <CardTitle className="font-headline flex items-center gap-2 text-xl">
               <User />
-              Your Turn! ({game.gameMode} mode)
+              {canSubmitAnytime ? `Play Now! (${game.gameMode} mode)` : `Your Turn! (${game.gameMode} mode)`}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 pt-3">
@@ -906,7 +908,7 @@ const renderDiscardUI = () => {
         </Card>
       )}
 
-      {!isMyTurn && game.gameState === 'playerTurn' && (
+      {!canSubmitAnytime && !isSpecialModeMyTurn && game.gameState === 'playerTurn' && (
         <Card className="game-surface text-center p-4 md:col-start-2">
           <CardTitle className="font-headline flex items-center justify-center gap-2 text-xl">
             <Users />
@@ -1014,7 +1016,7 @@ const renderDiscardUI = () => {
                       'transition-all duration-200',
                       {
                         "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
-                        "cursor-not-allowed": !isMyTurn
+                        "cursor-not-allowed": !canInteractWithHand
                       }
                     )}
                   />
@@ -1041,7 +1043,7 @@ const renderDiscardUI = () => {
                         'transition-all duration-200',
                         {
                           "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
-                          "cursor-not-allowed": !isMyTurn
+                          "cursor-not-allowed": !canInteractWithHand
                         }
                       )}
                     />
