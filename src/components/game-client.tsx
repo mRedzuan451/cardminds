@@ -905,7 +905,11 @@ const renderDiscardUI = () => {
               {equation.length > 0 ? equationString : <span className="text-muted-foreground text-base font-normal">Click cards to build an equation.</span>}
             </div>
             <div className="flex flex-col gap-3 mt-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className={cn("grid grid-cols-2 gap-2 self-start", (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden")}> 
+              <div className={cn(
+                "grid grid-cols-2 gap-2 self-start",
+                (game.gameMode !== 'pro' && game.gameMode !== 'special') && "hidden",
+                allPlayersSubmitted && game.gameMode !== 'special' && "hidden"
+              )}> 
                 <Button onClick={() => handleParenthesisClick('(')} variant="outline" size="sm" className="font-bold text-lg">(</Button>
                 <Button onClick={() => handleParenthesisClick(')')} variant="outline" size="sm" className="font-bold text-lg">)</Button>
               </div>
