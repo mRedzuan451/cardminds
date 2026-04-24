@@ -837,7 +837,7 @@ const renderDiscardUI = () => {
           </CardContent>
         </Card>
         
-        <div className="w-full md:col-span-1 flex flex-col items-center justify-center gap-4">
+        <div className={cn("w-full md:col-span-1 flex flex-col items-center justify-center gap-4", "hidden")}>
             <Card className="game-surface text-center p-5 w-full">
               <CardHeader className="p-0 mb-1">
                   <CardTitle className="text-lg text-muted-foreground font-headline">Target</CardTitle>
