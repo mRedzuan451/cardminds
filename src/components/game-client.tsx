@@ -225,12 +225,18 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     return players.every(player => player.passed);
   }, [game, players]);
 
-  // Reset equation when turn changes
+  // Reset equation when turn/round context changes
   useEffect(() => {
-    if (!canSubmitAnytime && !isSpecialModeMyTurn) {
-        handleClearEquation();
+    if (!game || !localPlayer) return;
+
+    const isMyActiveTurn = game.gameState === 'playerTurn'
+      ? (canSubmitAnytime || isSpecialModeMyTurn)
+      : false;
+
+    if (!isMyActiveTurn) {
+      handleClearEquation();
     }
-  }, [canSubmitAnytime, isSpecialModeMyTurn]);
+  }, [game?.gameState, game?.currentPlayerId, game?.currentRound, canSubmitAnytime, isSpecialModeMyTurn, localPlayer]);
 
   // Reset discard selection when discard state changes
   useEffect(() => {
