@@ -220,16 +220,6 @@ export const startGame = ai.defineFlow({ name: 'startGame', inputSchema: StartGa
   });
   console.log(`[startGame] Dealt 5 cards to each player.`);
 
-  if (freshDeck.length > 0) {
-      const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-      const firstPlayerHand = dealtHands[firstPlayerId];
-      if (firstPlayerHand) {
-          const newHand = [...firstPlayerHand, freshDeck.shift()!];
-          batch.update(firstPlayerRef, { hand: newHand });
-          console.log(`[startGame] Dealt starting card to first player ${firstPlayerId}.`);
-      }
-  }
-
   console.log(`[DEBUG] Unused deck after starting game ${gameId}:`, freshDeck.map(c => c.id));
 
   batch.update(gameRef, {
