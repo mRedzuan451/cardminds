@@ -636,6 +636,44 @@ const renderDiscardUI = () => {
     return <p className="text-4xl md:text-5xl font-bold my-6 text-primary">{winnerMessage}</p>;
   };
 
+  const renderRoundScoreBreakdown = () => {
+    if (!game || game.gameState !== 'roundOver' || !players) return null;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-left">
+        {players.map(player => (
+          <div key={player.id} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 shadow-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 font-bold text-lg">
+                <User className="h-4 w-4" />
+                <span>{player.name}</span>
+              </div>
+              <Badge variant="secondary" className="bg-primary/20 text-primary">
+                {player.roundScore} pts
+              </Badge>
+            </div>
+            <div className="mt-3 flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+              <span className="uppercase tracking-wide">Equation</span>
+              {player.equation.length > 0 ? (
+                <>
+                  {player.equation.map((term, i) => (
+                    <Badge key={i} variant={typeof term === 'number' ? 'secondary' : (term === '+' || term === '-' || term === '*' || term === '/') ? 'default' : 'outline'} className="text-base p-2">
+                      {term === '*' ? '×' : term === '/' ? '÷' : term === '**' ? '^2' : term}
+                    </Badge>
+                  ))}
+                  <span className="mx-2">=</span>
+                  <span className="font-bold text-accent">{player.finalResult}</span>
+                </>
+              ) : (
+                <span>Passed.</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderTotalWinnerBanner = () => {
     if (!game || game.gameState !== 'gameOver' || !players) return null;
     if (totalWinner.length === 0) return null;
@@ -956,6 +994,7 @@ const renderDiscardUI = () => {
               {renderTotalWinnerBanner()}
             </div>
           )}
+          {game.gameState === 'roundOver' && renderRoundScoreBreakdown()}
           {game.gameState === 'gameOver' && (
             <div className="mt-6 flex justify-center">
               <Button onClick={handleRematch} size="lg" className="shadow-lg" disabled={game.creatorId !== localPlayer.id || isRematching}>
