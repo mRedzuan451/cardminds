@@ -508,17 +508,6 @@ export const nextRound = ai.defineFlow({ name: 'nextRound', inputSchema: GameIdI
         }
       }
   
-      // Deal starting card to first player, but not in special mode
-      if ((game.gameMode === 'easy' || game.gameMode === 'pro') && freshDeck.length > 0) {
-        const firstPlayerRef = doc(db, 'games', gameId, 'players', firstPlayerId);
-        const firstPlayerHand = dealtHands[firstPlayerId];
-        if (firstPlayerHand) {
-            const newHand = [...firstPlayerHand, freshDeck.shift()!];
-            transaction.update(firstPlayerRef, { hand: newHand });
-            console.log(`[nextRound] Dealt starting card to first player ${firstPlayerId}.`);
-        }
-      }
-  
       console.log(`[DEBUG] Unused deck after starting round for game ${gameId}:`, freshDeck.map(c => c.id));
       
       // Determine next game state
