@@ -378,10 +378,19 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
   }
 
   const handleSaveSpecialConfig = async (allowedCards: Rank[]) => {
-    await gameActions.setAllowedSpecialCards({ gameId, allowedCards });
-    await gameActions.setGameMode({ gameId, mode: 'special' });
-    setIsSpecialConfigOpen(false);
-    toast({ title: "Special Mode Configured!", description: "The special cards for this game have been set." });
+    try {
+      await gameActions.setAllowedSpecialCards({ gameId, allowedCards });
+      await gameActions.setGameMode({ gameId, mode: 'special' });
+      setIsSpecialConfigOpen(false);
+      toast({ title: "Special Mode Configured!", description: "The special cards for this game have been set." });
+    } catch (error: any) {
+      console.error('[handleSaveSpecialConfig] Failed to save special card configuration:', error);
+      toast({
+        title: 'Failed to save special configuration',
+        description: error?.message ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const totalWinner = useMemo(() => {
