@@ -1048,6 +1048,8 @@ const renderDiscardUI = () => {
             <div className="game-card-stack md:-space-x-12">
               {handRow1.map((card, index) => {
                 const handIndex = index;
+                const isLatestCard = activeHand.length > 0 && handIndex === activeHand.length - 1;
+                const hideLatestCard = game.gameMode === 'special' && !isSpecialModeMyTurn && isLatestCard;
                 return (
                 <div
                   key={card.id}
@@ -1059,6 +1061,7 @@ const renderDiscardUI = () => {
                   <GameCard
                     card={card}
                     mode={game.gameMode}
+                    isFaceDown={hideLatestCard}
                     onClick={() => handleCardClick(card, handIndex)}
                     className={cn(
                       'transition-all duration-200',
@@ -1075,6 +1078,8 @@ const renderDiscardUI = () => {
               <div className="game-card-stack md:-space-x-12">
                 {handRow2.map((card, index) => {
                   const handIndex = index + 7;
+                  const isLatestCard = activeHand.length > 0 && handIndex === activeHand.length - 1;
+                  const hideLatestCard = game.gameMode === 'special' && !isSpecialModeMyTurn && isLatestCard;
                   return (
                   <div
                     key={card.id}
@@ -1086,6 +1091,7 @@ const renderDiscardUI = () => {
                     <GameCard
                       card={card}
                       mode={game.gameMode}
+                      isFaceDown={hideLatestCard}
                       onClick={() => handleCardClick(card, handIndex)}
                       className={cn(
                         'transition-all duration-200',
