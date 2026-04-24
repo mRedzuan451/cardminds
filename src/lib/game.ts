@@ -35,7 +35,9 @@ export function getCardValues(mode: GameMode): Record<Rank, EquationTerm> {
 
 export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRanks: Rank[] = SPECIAL_RANKS): Card[] {
     const deck: Card[] = [];
-    const deckCount = playerCount >= 4 ? 2 : 1;
+    // Keep the base deck unique in normal modes.
+    // Special mode may still expand the deck with special cards, but regular suits/ranks stay single-copy.
+    const deckCount = playerCount > 4 ? 2 : 1;
     let uniqueIdCounter = 0;
 
     for (let i = 0; i < deckCount; i++) {
@@ -47,7 +49,7 @@ export function createDeck(mode: GameMode, playerCount: number, allowedSpecialRa
     }
 
     if (mode === 'special') {
-        const specialDecks = playerCount >= 4 ? 2 : 1;
+        const specialDecks = playerCount > 4 ? 2 : 1;
         for (let i = 0; i < specialDecks; i++) {
             for (const rank of allowedSpecialRanks) {
                 // Add two of each special card per deck, ensuring unique IDs
