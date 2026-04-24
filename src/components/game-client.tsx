@@ -642,15 +642,28 @@ const renderDiscardUI = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-left">
         {players.map(player => (
-          <div key={player.id} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 shadow-lg">
+          <div key={player.id} className={cn(
+            "rounded-2xl border px-5 py-4 shadow-lg transition-all",
+            game.roundWinnerIds?.includes(player.id)
+              ? "border-amber-400/60 bg-amber-500/10 ring-1 ring-amber-400/40"
+              : "border-white/10 bg-white/5"
+          )}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 font-bold text-lg">
                 <User className="h-4 w-4" />
                 <span>{player.name}</span>
               </div>
-              <Badge variant="secondary" className="bg-primary/20 text-primary">
-                {player.roundScore} pts
-              </Badge>
+              <div className="flex items-center gap-2">
+                {game.roundWinnerIds?.includes(player.id) && (
+                  <Badge className="bg-amber-500/90 text-white border-0 gap-1">
+                    <Trophy className="h-3.5 w-3.5" />
+                    Round Winner
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="bg-primary/20 text-primary">
+                  {player.roundScore} pts
+                </Badge>
+              </div>
             </div>
             <div className="mt-3 flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
               <span className="uppercase tracking-wide">Equation</span>
