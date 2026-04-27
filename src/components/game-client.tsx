@@ -110,7 +110,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
 
   const [localPlayerName, setLocalPlayerName] = useState(playerName);
   const [equation, setEquation] = useState<EquationTerm[]>([]);
-  const [usedCardIndices, setUsedCardIndices] = useState<Set<number>>(new Set());
+  const [usedCardIndices, setUsedCardIndices] = useState<Set<string>>(new Set());
   const [showHint, setShowHint] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isRematching, setIsRematching] = useState(false);
@@ -263,9 +263,9 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     setEquation([...equation, paren]);
   };
 
-  const handleCardClick = (card: CardType, index: number) => {
+  const handleCardClick = (card: CardType) => {
     if (!canInteractWithHand) return;
-    if (usedCardIndices.has(index)) return;
+    if (usedCardIndices.has(card.id)) return;
 
     if (card.suit === 'Special' && localPlayer) {
         gameActions.playSpecialCard({ gameId, playerId: localPlayer.id, card });
@@ -283,7 +283,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
     }
     
     setEquation([...equation, value]);
-    setUsedCardIndices(new Set([...usedCardIndices, index]));
+    setUsedCardIndices(new Set([...usedCardIndices, card.id]));
   };
 
   const handleClearEquation = () => {
@@ -328,7 +328,7 @@ export default function GameClient({ gameId, playerName }: { gameId: string, pla
         return;
     }
 
-    const cardsUsed = Array.from(usedCardIndices).map(index => activeHand[index]);
+    const cardsUsed = activeHand.filter(card => usedCardIndices.has(card.id));
     
     try {
       await gameActions.playerAction({
@@ -1063,7 +1063,7 @@ const renderDiscardUI = () => {
             <div className="game-card-stack md:-space-x-12">
               {handRow1.map((card, index) => {
                 const handIndex = index;
-                const isLatestCard = activeHand.length > 0 && handIndex === activeHand.length - 1;
+                const isLatestCard = activeHand.length > 0 && index === activeHand.length - 1;
                 const hideLatestCard = game.gameMode === 'special' && !isSpecialModeMyTurn && isLatestCard;
                 return (
                 <div
@@ -1077,11 +1077,11 @@ const renderDiscardUI = () => {
                     card={card}
                     mode={game.gameMode}
                     isFaceDown={hideLatestCard}
-                    onClick={() => handleCardClick(card, handIndex)}
+                    onClick={() => handleCardClick(card)}
                     className={cn(
                       'transition-all duration-200',
                       {
-                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
+                        "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(card.id),
                         "cursor-not-allowed": !canInteractWithHand
                       }
                     )}
@@ -1096,31 +1096,31 @@ const renderDiscardUI = () => {
                   const isLatestCard = activeHand.length > 0 && handIndex === activeHand.length - 1;
                   const hideLatestCard = game.gameMode === 'special' && !isSpecialModeMyTurn && isLatestCard;
                   return (
-                  <div
-                    key={card.id}
-                    className={cn(
-                      "transition-all duration-300 ease-out hover:-translate-y-4"
-                    )}
-                    style={{ zIndex: handIndex }}
-                  >
-                    <GameCard
-                      card={card}
-                      mode={game.gameMode}
-                      isFaceDown={hideLatestCard}
-                      onClick={() => handleCardClick(card, handIndex)}
+                    <div
+                      key={card.id}
                       className={cn(
-                        'transition-all duration-200',
-                        {
-                          "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(handIndex),
-                          "cursor-not-allowed": !canInteractWithHand
-                        }
+                        "transition-all duration-300 ease-out hover:-translate-y-4"
                       )}
-                    />
-                  </div>
-                );})}
+                      style={{ zIndex: handIndex }}
+                    >
+                      <GameCard
+                        card={card}
+                        mode={game.gameMode}
+                        isFaceDown={hideLatestCard}
+                        onClick={() => handleCardClick(card)}
+                        className={cn(
+                          'transition-all duration-200',
+                          {
+                            "opacity-30 scale-90 -translate-y-4 cursor-not-allowed": usedCardIndices.has(card.id),
+                            "cursor-not-allowed": !canInteractWithHand
+                          }
+                        )}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
-          </div>
         </div>
       </div>
     </div>
